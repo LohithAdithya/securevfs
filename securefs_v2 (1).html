@@ -1141,6 +1141,7 @@ openIDB().then(hydrateFromIDB).catch(()=>{});
 // ROUTING
 // ================================================================
 function goToLogin() {
+  if (typeof initNetwork === 'function') window.networkComplex = true;
   document.getElementById('landing-screen').style.display='none';
   document.getElementById('login-screen').style.display='flex';
 }
@@ -3478,6 +3479,7 @@ function nativeFullscreen() {
 }
 
 // NEURAL NETWORK BACKGROUND
+window.networkComplex = false;
 function initNetwork() {
   const canvas = document.getElementById('network-canvas');
   if (!canvas) return;
@@ -3485,7 +3487,7 @@ function initNetwork() {
   let w, h;
   const particles = [];
   const particleCount = 80;
-  const maxDist = 150;
+  let maxDist = 140;
 
   function resize() {
     w = canvas.width = window.innerWidth;
@@ -3498,14 +3500,15 @@ function initNetwork() {
     constructor() {
       this.x = Math.random() * w;
       this.y = Math.random() * h;
-      this.vx = (Math.random() - 0.5) * 0.4;
-      this.vy = (Math.random() - 0.5) * 0.4;
-      this.radius = Math.random() * 1.5 + 1;
+      this.vx = (Math.random() - 0.5) * 0.25; // Slower movement
+      this.vy = (Math.random() - 0.5) * 0.25;
+      this.radius = Math.random() * 1.2 + 0.8;
       this.flash = 0;
     }
     update() {
-      this.x += this.vx;
-      this.y += this.vy;
+      const speedMult = window.networkComplex ? 1.5 : 1;
+      this.x += this.vx * speedMult;
+      this.y += this.vy * speedMult;
       if (this.x < 0 || this.x > w) this.vx *= -1;
       if (this.y < 0 || this.y > h) this.vy *= -1;
       if (this.flash > 0) this.flash -= 0.02;
@@ -3513,7 +3516,7 @@ function initNetwork() {
     draw() {
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.radius + (this.flash * 2), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + this.flash})`;
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + this.flash})`;
       ctx.fill();
       if (this.flash > 0.3) {
         ctx.shadowBlur = 15 * this.flash;
@@ -3528,6 +3531,8 @@ function initNetwork() {
 
   function draw() {
     ctx.clearRect(0, 0, w, h);
+    const currentMaxDist = window.networkComplex ? maxDist * 1.5 : maxDist;
+    
     for (let i = 0; i < particles.length; i++) {
       const p1 = particles[i];
       p1.update();
@@ -3538,21 +3543,20 @@ function initNetwork() {
         const dy = p1.y - p2.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         
-        if (dist < maxDist) {
-          // Occasional flash when close
-          if (Math.random() < 0.001) {
+        if (dist < currentMaxDist) {
+          if (Math.random() < 0.0005) {
             p1.flash = 1;
             p2.flash = 1;
           }
           
           ctx.beginPath();
-          const alpha = (0.15 * (1 - dist / maxDist)) * (1 + p1.flash);
+          const alpha = (0.12 * (1 - dist / currentMaxDist)) * (1 + p1.flash);
           ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-          ctx.lineWidth = 0.6;
+          ctx.lineWidth = 0.5;
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
           ctx.stroke();
-          ctx.shadowBlur = 0; // reset for lines
+          ctx.shadowBlur = 0;
         }
       }
     }
