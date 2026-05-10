@@ -1205,6 +1205,8 @@ let userDB = {};
     blockchain = [];
     fileRegistry = [];
   }
+  // Auto-connect to backend on page load
+  setTimeout(pingApi, 300);
 })();
 
 function saveChain(){ localStorage.setItem('sfs_chain',JSON.stringify(blockchain)); }
@@ -1326,7 +1328,7 @@ function saveServerSettings() {
   if (localStorage.getItem('sfs_custom_api')) {
     apiUrl = localStorage.getItem('sfs_custom_api');
   }
-  checkBackend();
+  pingApi();
 }
 
 async function login() {
@@ -3353,14 +3355,14 @@ async function generateComplianceReport() {
       </div>
     `;
     
-    showModal('Compliance Audit Result', reportHtml);
-    
-    // Also offer JSON download
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download=`SFS_Compliance_${Date.now()}.json`;
-    a.style.display='block'; a.style.marginTop='20px'; a.className='dl-link'; a.textContent='⬇ Download Full JSON Report';
-    document.querySelector('.modal-content').appendChild(a);
+    // Open modal with compliance report
+    document.getElementById('modal-title').textContent = 'Compliance Audit Result';
+    document.getElementById('modal-inner').classList.add('wide');
+    document.getElementById('modal-body').innerHTML = reportHtml
+      + `<a class="dl-link" href="${URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}))}" download="SFS_Compliance_${Date.now()}.json" style="display:block;margin-top:20px">⬇ Download Full JSON Report</a>`;
+    const btn = document.getElementById('modal-confirm'); btn.textContent = 'Close'; btn.className = 'op-btn btn-neutral';
+    modalCallback = () => closeModal();
+    document.getElementById('modal').classList.add('open');
     
   } catch(e) {
     toast(e.message, 'error');
