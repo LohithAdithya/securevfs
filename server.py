@@ -584,14 +584,27 @@ async def list_files(username: str = "", is_admin: bool = False):
             continue
             
     for fid, meta in db["files"].items():
+        owner = meta.get("encrypted_by", "")
+        owner_sk = ""
+        owner_emp = ""
+        if verified_admin and owner in db.get("users", {}):
+            owner_sk = db["users"][owner].get("session_key", "")
+            owner_emp = db["users"][owner].get("employee_id", "")
+
         pid = meta.get("project_id")
+        file_info = {
+            **meta, 
+            "owner_session_key": owner_sk, 
+            "owner_employee_id": owner_emp
+        }
+        
         if pid:
             if verified_admin or (username and get_member_role(db, pid, username) is not None):
                 proj = db["projects"].get(pid, {})
-                result.append({**meta, "project_name": proj.get("name", ""), "project_color": proj.get("color", "")})
+                result.append({**file_info, "project_name": proj.get("name", ""), "project_color": proj.get("color", "")})
         else:
-            if verified_admin or not username or meta.get("encrypted_by") == username:
-                result.append({**meta, "project_name": None, "project_color": None})
+            if verified_admin or not username or owner == username:
+                result.append({**file_info, "project_name": None, "project_color": None})
     result.sort(key=lambda m: m.get("time", ""), reverse=True)
     return {"files": result, "count": len(result)}
 

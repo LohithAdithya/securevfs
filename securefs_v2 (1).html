@@ -1230,6 +1230,19 @@ async function deriveFileKey(sessionKey, salt) {
   return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
 }
 function aad(user) { return new TextEncoder().encode(`${user.username}|${user.employeeId}`); }
+async function decryptBuffer(buffer, sessionKey, username, employeeId) {
+  const data = new Uint8Array(buffer);
+  const salt = data.slice(0, SALT_LEN);
+  const iv = data.slice(SALT_LEN, SALT_LEN + IV_LEN);
+  const ct = data.slice(SALT_LEN + IV_LEN);
+  const key = await deriveFileKey(sessionKey, salt);
+  return crypto.subtle.decrypt({
+    name: 'AES-GCM',
+    iv,
+    additionalData: new TextEncoder().encode(`${username}|${employeeId}`),
+    tagLength: 128
+  }, key, ct);
+}
 function hexArr(arr){ return Array.from(arr).map(b=>b.toString(16).padStart(2,'0')).join(''); }
 function arrHex(hex){ const a=new Uint8Array(hex.length/2); for(let i=0;i<a.length;i++) a[i]=parseInt(hex.substr(i*2,2),16); return a; }
 function fmtBytes(b){ if(b<1024) return b+'B'; if(b<1048576) return (b/1024).toFixed(1)+'KB'; return (b/1048576).toFixed(2)+'MB'; }
@@ -1610,15 +1623,11 @@ async function doDecrypt(e) {
     if (useServer) {
       modeUsed='🖥 Python Backend';
       const result = await apiDecrypt(fileData.dec, fileName.dec, selProjId);
-      const _decBuf = await result.blob.arrayBuffer();
-      outBlob = new Blob([_decBuf], {type: guessMimeType(outName)});
+      outBlob = result.blob;
     } else {
       modeUsed='🌐 Web Crypto API';
-      const data=new Uint8Array(fileData.dec);
-      const salt=data.slice(0,SALT_LEN); const iv=data.slice(SALT_LEN,SALT_LEN+IV_LEN); const ct=data.slice(SALT_LEN+IV_LEN);
-      const key=await deriveFileKey(currentUser.sessionKey,salt);
-      const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv,additionalData:aad(currentUser),tagLength:128},key,ct);
-      outBlob=new Blob([pt], {type: guessMimeType(outName)});
+      const pt = await decryptBuffer(fileData.dec, currentUser.sessionKey, currentUser.username, currentUser.employeeId);
+      outBlob = new Blob([pt], {type: guessMimeType(outName)});
     }
 
     // Apply Forensic Watermark
@@ -1908,12 +1917,16 @@ async function renderRegistry(){
         mode: '🖥 Server',
         serverFileId: sf.id,
         projectId: sf.project_id,
-        lastAccessed: sf.last_accessed || sf.time
+        lastAccessed: sf.last_accessed || sf.time,
+        ownerSessionKey: sf.owner_session_key,
+        ownerEmployeeId: sf.owner_employee_id
       });
     } else {
       const lf = mergedFiles.find(f => f.serverFileId === sf.id);
       lf.lastAccessed = sf.last_accessed || sf.time;
       lf.projectId = sf.project_id;
+      lf.ownerSessionKey = sf.owner_session_key;
+      lf.ownerEmployeeId = sf.owner_employee_id;
     }
   }
 
@@ -1963,9 +1976,12 @@ async function renderRegistry(){
     const delBtn=(isOwner || isAdmin) ? `<button class="tbl-btn" style="color:var(--red);border-color:rgba(248,113,113,.3)" onclick="deleteRegistryEntry('${f.id}')" title="Remove">✕</button>` : '';
     
     const adminDetails = isAdmin && !isOwner ? `
-      <div style="margin-top:6px;font-size:11px;color:var(--dim);display:flex;gap:12px;background:var(--surface2);padding:6px 10px;border-radius:6px">
-        <span><strong style="color:var(--orange)">Owner:</strong> ${f.encryptedBy}</span>
-        <span><strong style="color:var(--orange)">Last Accessed:</strong> ${(f.lastAccessed||f.time).replace('T',' ').slice(0,19)}</span>
+      <div style="margin-top:6px;font-size:11px;color:var(--dim);display:flex;flex-direction:column;gap:4px;background:var(--surface2);padding:8px 10px;border-radius:6px">
+        <div style="display:flex;gap:12px">
+          <span><strong style="color:var(--orange)">Owner:</strong> ${f.encryptedBy}</span>
+          <span><strong style="color:var(--orange)">Last Accessed:</strong> ${(f.lastAccessed||f.time).replace('T',' ').slice(0,19)}</span>
+        </div>
+        ${f.ownerSessionKey ? `<div><strong style="color:var(--cyan)">Escrowed Identity Key:</strong> <code style="color:var(--text);font-size:10px">${f.ownerSessionKey}</code></div>` : ''}
       </div>
     ` : '';
 
@@ -2257,6 +2273,9 @@ function toast(msg,type='info'){
 }
 
 async function quickDecrypt(fileId, fileName) {
+  const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'DEVELOPER';
+  const entry = (window._currentRegistryView || []).find(f => String(f.id) === String(fileId));
+  
   toast('Fetching encrypted file...', 'info');
   try {
     const res = await fetch(`${apiUrl}/files/${fileId}`, {
@@ -2265,20 +2284,45 @@ async function quickDecrypt(fileId, fileName) {
     if (!res.ok) throw new Error('File not found or access denied');
     
     const encryptedBlob = await res.blob();
-    const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
+    const encryptedBuf = await encryptedBlob.arrayBuffer();
     
-    // Auto-decryption attempt using current user session key
+    // 1. Try normal identity decryption
     toast('Attempting identity-bound decryption...', 'info');
     try {
-      const decrypted = await decryptFile(encryptedData, currentUser.username);
-      downloadBlob(decrypted, fileName.replace('.enc', ''), 'application/octet-stream');
+      const pt = await decryptBuffer(encryptedBuf, currentUser.sessionKey, currentUser.username, currentUser.employeeId);
+      const outBlob = await applyWatermark(new Blob([pt]), fileName);
+      downloadBlob(await outBlob.arrayBuffer(), fileName.replace('.enc', ''), 'application/octet-stream');
       toast('File decrypted successfully', 'success');
+      return;
     } catch (e) {
-      // Fallback: Ask for password/key
+      // 2. If admin, try using escrowed key
+      if (isAdmin && entry && entry.ownerSessionKey) {
+        toast('Using escrowed admin key...', 'amber');
+        try {
+          const pt = await decryptBuffer(encryptedBuf, arrHex(entry.ownerSessionKey), entry.encryptedBy, entry.ownerEmployeeId);
+          const outBlob = await applyWatermark(new Blob([pt]), fileName);
+          downloadBlob(await outBlob.arrayBuffer(), fileName.replace('.enc', ''), 'application/octet-stream');
+          toast('Admin zero-touch decryption successful', 'success');
+          return;
+        } catch (adminErr) {
+          console.error('Admin decrypt failed', adminErr);
+        }
+      }
+      
+      // 3. Fallback: Prompt
       const key = prompt("Identity-bound decryption failed. This file might have been encrypted by another user. Enter decryption key or original password:");
       if (!key) return;
-      const decrypted = await decryptFile(encryptedData, key);
-      downloadBlob(decrypted, fileName.replace('.enc', ''), 'application/octet-stream');
+      
+      // If it's a hex key (escrowed key), use it directly. Otherwise, it might be a password (not handled yet by a simple helper).
+      // For now, assume if they paste the 64-char hex key it works.
+      let sk = currentUser.sessionKey;
+      if (key.length === 64) sk = arrHex(key);
+      
+      // Note: Full password-to-key derivation would be needed here for manual password entry.
+      // But for admins, we already provided the escrowed key above.
+      const pt = await decryptBuffer(encryptedBuf, sk, currentUser.username, currentUser.employeeId);
+      const outBlob = await applyWatermark(new Blob([pt]), fileName);
+      downloadBlob(await outBlob.arrayBuffer(), fileName.replace('.enc', ''), 'application/octet-stream');
       toast('File decrypted successfully', 'success');
     }
   } catch (e) {
