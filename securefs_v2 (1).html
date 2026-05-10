@@ -309,10 +309,10 @@ canvas{width:100%!important}
   background: #000;
   overflow: hidden;
 }
-#terrain-canvas {
+#network-canvas {
   position: absolute;
   top: 0; left: 0; width: 100vw; height: 100vh;
-  opacity: 0.8;
+  opacity: 0.5;
   z-index: 0;
 }
 
@@ -432,7 +432,7 @@ canvas{width:100%!important}
 <body oncontextmenu="return false" onkeydown="if(event.ctrlKey && (event.key==='u'||event.key==='s'))return false">
 
 <div class="mesh-bg">
-  <canvas id="terrain-canvas"></canvas>
+  <canvas id="network-canvas"></canvas>
 </div>
 
 <div class="cursor-glow" id="cursor-glow"></div>
@@ -3417,7 +3417,7 @@ async function generateComplianceReport() {
         </div>
 
         <h3 style="margin-top:20px; color:var(--red);">Recent Failures / High Risk</h3>
-        ${data.high_risk_events.length ? data.high_risk_events.map(e=>`
+          ${data.high_risk_events.length ? data.high_risk_events.map(e=>`
           <div style="font-size:11px; margin-top:5px; color:var(--muted)">[${e.time}] ${e.user}: ${e.action} -> ${e.status}</div>
         `).join('') : '<div style="color:var(--green)">No high-risk events found.</div>'}
       </div>
@@ -3457,16 +3457,35 @@ function nativeFullscreen() {
   if (isDesktop) window.pywebview.api.toggle_fullscreen();
 }
 
-// DIGITAL TERRAIN SYSTEM
-function initTerrain() {
-  const canvas = document.getElementById('terrain-canvas');
+// --- DESKTOP NATIVE BRIDGE ---
+window.addEventListener('pywebviewready', function() {
+  isDesktop = true;
+  document.body.classList.add('desktop-mode');
+  
+  // Call Python to get status
+  window.pywebview.api.get_status().then(status => {
+    console.log('Desktop Native Status:', status);
+    toast('SecureFS Desktop Bridge Active: ' + status.version, 'success');
+  });
+});
+
+function nativeMinimize() {
+  if (isDesktop) window.pywebview.api.minimize();
+}
+
+function nativeFullscreen() {
+  if (isDesktop) window.pywebview.api.toggle_fullscreen();
+}
+
+// NEURAL NETWORK BACKGROUND
+function initNetwork() {
+  const canvas = document.getElementById('network-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   let w, h;
-  const cols = 45;
-  const rows = 40;
-  const gap = 35;
-  let offset = 0;
+  const particles = [];
+  const particleCount = 80;
+  const maxDist = 150;
 
   function resize() {
     w = canvas.width = window.innerWidth;
@@ -3475,61 +3494,75 @@ function initTerrain() {
   window.addEventListener('resize', resize);
   resize();
 
+  class Particle {
+    constructor() {
+      this.x = Math.random() * w;
+      this.y = Math.random() * h;
+      this.vx = (Math.random() - 0.5) * 0.4;
+      this.vy = (Math.random() - 0.5) * 0.4;
+      this.radius = Math.random() * 1.5 + 1;
+      this.flash = 0;
+    }
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      if (this.x < 0 || this.x > w) this.vx *= -1;
+      if (this.y < 0 || this.y > h) this.vy *= -1;
+      if (this.flash > 0) this.flash -= 0.02;
+    }
+    draw() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius + (this.flash * 2), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + this.flash})`;
+      ctx.fill();
+      if (this.flash > 0.3) {
+        ctx.shadowBlur = 15 * this.flash;
+        ctx.shadowColor = '#fff';
+      } else {
+        ctx.shadowBlur = 0;
+      }
+    }
+  }
+
+  for (let i = 0; i < particleCount; i++) particles.push(new Particle());
+
   function draw() {
     ctx.clearRect(0, 0, w, h);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 1;
-    
-    offset += 0.005;
-    
-    const centerX = w / 2;
-    const centerY = h / 2;
-    
-    // Draw horizontal lines
-    for (let j = 0; j < rows; j++) {
-      ctx.beginPath();
-      for (let i = 0; i < cols; i++) {
-        const x = (i - cols / 2) * gap + centerX;
-        const y_base = (j - rows / 2) * gap + centerY + 100;
+    for (let i = 0; i < particles.length; i++) {
+      const p1 = particles[i];
+      p1.update();
+      p1.draw();
+      for (let j = i + 1; j < particles.length; j++) {
+        const p2 = particles[j];
+        const dx = p1.x - p2.x;
+        const dy = p1.y - p2.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
         
-        // Perspective effect
-        const dist = Math.sqrt((i - cols / 2) ** 2 + (j - rows / 2) ** 2);
-        const z = Math.sin(i * 0.2 + offset) * Math.cos(j * 0.15 + offset * 0.8) * 40 * (1 - dist / 40);
-        
-        const px = x;
-        const py = y_base - z - (j * 2); // Tilt effect
-        
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+        if (dist < maxDist) {
+          // Occasional flash when close
+          if (Math.random() < 0.001) {
+            p1.flash = 1;
+            p2.flash = 1;
+          }
+          
+          ctx.beginPath();
+          const alpha = (0.15 * (1 - dist / maxDist)) * (1 + p1.flash);
+          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+          ctx.lineWidth = 0.6;
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+          ctx.shadowBlur = 0; // reset for lines
+        }
       }
-      ctx.stroke();
     }
-    
-    // Draw vertical lines
-    for (let i = 0; i < cols; i++) {
-      ctx.beginPath();
-      for (let j = 0; j < rows; j++) {
-        const x = (i - cols / 2) * gap + centerX;
-        const y_base = (j - rows / 2) * gap + centerY + 100;
-        const dist = Math.sqrt((i - cols / 2) ** 2 + (j - rows / 2) ** 2);
-        const z = Math.sin(i * 0.2 + offset) * Math.cos(j * 0.15 + offset * 0.8) * 40 * (1 - dist / 40);
-        
-        const px = x;
-        const py = y_base - z - (j * 2);
-        
-        if (j === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-    }
-    
     requestAnimationFrame(draw);
   }
   draw();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  initTerrain();
+  initNetwork();
 });
 </script>
 </body>
