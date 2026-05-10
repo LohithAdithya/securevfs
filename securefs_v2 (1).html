@@ -973,7 +973,6 @@ canvas{width:100%!important}
                 <option value="terrain">🏔 Digital Terrain (Topographic)</option>
               </select>
             </div>
-            <button class="op-btn btn-action" onclick="bgEngine.triggerLightning()" id="lightning-test-btn">Strike Lightning</button>
           </div>
         </div>
 
@@ -3513,7 +3512,7 @@ const bgEngine = new (class {
 
   init() {
     this.canvas = document.getElementById('network-canvas');
-    if (!canvas) return;
+    if (!this.canvas) return;
     this.ctx = this.canvas.getContext('2d');
     
     window.addEventListener('resize', () => this.resize());
