@@ -14,8 +14,8 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#09090b;--surface:#18181b;--surface2:#27272a;--surface3:#3f3f46;
-  --border:#27272a;--border2:#3f3f46;
+  --bg:#000000;--surface:rgba(18,18,21,0.6);--surface2:rgba(39,39,42,0.4);--surface3:rgba(63,63,70,0.4);
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);
   --accent:#ffffff;--accent-dim:rgba(255,255,255,.05);--accent-glow:rgba(255,255,255,.1);
   --primary:#3b82f6;--primary-dim:rgba(59,130,246,.1);--primary-hover:#2563eb;
   --green:#10b981;--green-dim:rgba(16,185,129,.1);
@@ -30,12 +30,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
 
 /* HEADER */
-header{display:flex;align-items:center;justify-content:space-between;padding:16px 32px;border-bottom:1px solid var(--border);background:rgba(9,9,11,.8);backdrop-filter:blur(12px);position:sticky;top:0;z-index:200}
+.logo-v2{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
 .logo{display:flex;align-items:center;gap:12px;flex-shrink:0;cursor:pointer}
 .logo-mark{width:32px;height:32px;border-radius:8px;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600}
 .logo-text{font-weight:700;font-size:18px;letter-spacing:-0.5px;color:var(--text)}
-.logo-text .hi{color:var(--primary)}
-.logo-v2{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.logo-text span{color:var(--primary)}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 32px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.6);backdrop-filter:blur(24px);position:sticky;top:0;z-index:200}
 .header-mid{display:flex;align-items:center;gap:12px;flex:1;justify-content:center;font-size:12px}
 
 /* API STATUS */
@@ -301,6 +301,55 @@ tr:hover td{background:var(--surface2)}
 .cmp-unique-badge{font-size:11px;padding:4px 10px;border-radius:100px;background:var(--surface2);color:var(--text);font-weight:600}
 canvas{width:100%!important}
 
+/* OBSIDIAN SILK BACKGROUND */
+.mesh-bg {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: -1;
+  background: #000;
+  overflow: hidden;
+}
+.mesh-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(39, 39, 42, 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(24, 24, 27, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, #000000 0%, #09090b 50%, #000000 100%);
+  filter: contrast(120%);
+}
+.silk-wave {
+  position: absolute;
+  width: 200%; height: 200%;
+  top: -50%; left: -50%;
+  background: radial-gradient(ellipse at center, rgba(59,130,246,0.03) 0%, transparent 70%);
+  transform: rotate(-15deg);
+  animation: silkMove 20s infinite ease-in-out;
+  pointer-events: none;
+}
+@keyframes silkMove {
+  0%, 100% { transform: rotate(-15deg) translateY(0) scale(1); }
+  50% { transform: rotate(-10deg) translateY(-20px) scale(1.05); }
+}
+
+/* PARTICLES */
+.particle {
+  position: absolute;
+  background: var(--primary);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(1px);
+  box-shadow: 0 0 4px var(--primary);
+}
+@keyframes particleFade {
+  0% { opacity: 0; transform: translateY(0); }
+  20% { opacity: 0.4; }
+  80% { opacity: 0.4; }
+  100% { opacity: 0; transform: translateY(-100px); }
+}
+
 /* MISC */
 .empty{text-align:center;padding:60px 24px;color:var(--muted)}
 .empty-icon{font-size:40px;margin-bottom:16px;opacity:0.5}
@@ -349,14 +398,6 @@ canvas{width:100%!important}
   opacity: 0;
   will-change: transform, opacity;
 }
-/* PREMIUM AMBIENT MESH BACKGROUND */
-.bg-anim { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: radial-gradient(circle at 50% 0%, #1a1a24 0%, #09090b 70%); }
-.bg-mesh { position: absolute; filter: blur(120px); border-radius: 50%; opacity: 0.5; mix-blend-mode: screen; animation: meshRotate 30s infinite linear; }
-.mesh-1 { width: 80vw; height: 80vw; background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 60%); top: -40vw; left: -20vw; transform-origin: 60% 60%; }
-.mesh-2 { width: 70vw; height: 70vw; background: radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 60%); bottom: -30vw; right: -10vw; transform-origin: 30% 30%; animation-direction: reverse; animation-duration: 40s; }
-.mesh-3 { width: 60vw; height: 60vw; background: radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 60%); top: 20vh; left: 20vw; transform-origin: 70% 30%; animation-duration: 50s; }
-
-@keyframes meshRotate { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.1); } 100% { transform: rotate(360deg) scale(1); } }
 
 /* MOBILE RESPONSIVE */
 @media (max-width: 800px) {
@@ -404,18 +445,16 @@ canvas{width:100%!important}
 .term-cmd { color: #fff; font-weight: bold; }
 .term-err { color: #f87171; }
 .term-succ { color: #34d399; }
-.term-warn { color: #fbbf24; }
-</style>
-
-
+.term-warn { color: #fbbf24; }</style>
 </head>
-<body>
-<div id="cursor-glow" class="cursor-glow"></div>
-<div class="bg-anim">
-  <div class="bg-mesh mesh-1"></div>
-  <div class="bg-mesh mesh-2"></div>
-  <div class="bg-mesh mesh-3"></div>
+<body oncontextmenu="return false" onkeydown="if(event.ctrlKey && (event.key==='u'||event.key==='s'))return false">
+
+<div class="mesh-bg" id="particle-container">
+  <div class="silk-wave"></div>
+  <div class="silk-wave" style="animation-delay:-10s; opacity:0.5; background:radial-gradient(ellipse at center, rgba(139,92,246,0.02) 0%, transparent 70%);"></div>
 </div>
+
+<div class="cursor-glow" id="cursor-glow"></div>
 <div class="app">
 <header>
   <div class="logo">
@@ -3436,6 +3475,41 @@ function nativeMinimize() {
 function nativeFullscreen() {
   if (isDesktop) window.pywebview.api.toggle_fullscreen();
 }
+
+// PARTICLE SYSTEM
+function initParticles() {
+  const container = document.getElementById('particle-container');
+  if (!container) return;
+  const count = 40;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 2 + 1;
+    const x = Math.random() * 100;
+    const y = Math.random() * 100;
+    const dur = Math.random() * 10 + 10;
+    const delay = Math.random() * 20;
+    
+    p.style.width = `${size}px`;
+    p.style.height = `${size}px`;
+    p.style.left = `${x}%`;
+    p.style.top = `${y}%`;
+    p.style.animation = `particleFade ${dur}s linear ${delay}s infinite`;
+    
+    // Vary colors slightly
+    const colors = ['#3b82f6', '#06b6d4', '#ffffff'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    p.style.background = color;
+    p.style.boxShadow = `0 0 4px ${color}`;
+    
+    container.appendChild(p);
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  init();
+  initParticles();
+});
 </script>
 </body>
 </html>
