@@ -3325,7 +3325,7 @@ async function generateComplianceReport() {
   toast('Generating Compliance Report...','info');
   try {
     const res = await fetch(`${apiUrl}/admin/compliance-report?username=${currentUser.username}`, {
-      headers: { 'X-Session-Token': currentUser.sessionKey }
+      headers: { 'X-Session-Token': hexArr(currentUser.sessionKey) }
     });
     if (!res.ok) throw new Error('Report generation failed');
     const data = await res.json();
