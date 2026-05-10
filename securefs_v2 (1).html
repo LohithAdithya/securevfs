@@ -3486,8 +3486,8 @@ function initNetwork() {
   const ctx = canvas.getContext('2d');
   let w, h;
   const particles = [];
-  const particleCount = 80;
-  let maxDist = 140;
+  const particleCount = 100;
+  let maxDist = 180;
 
   function resize() {
     w = canvas.width = window.innerWidth;
@@ -3500,26 +3500,28 @@ function initNetwork() {
     constructor() {
       this.x = Math.random() * w;
       this.y = Math.random() * h;
-      this.vx = (Math.random() - 0.5) * 0.25; // Slower movement
-      this.vy = (Math.random() - 0.5) * 0.25;
-      this.radius = Math.random() * 1.2 + 0.8;
+      this.vx = (Math.random() - 0.5) * 0.15; // Slow movement
+      this.vy = (Math.random() - 0.5) * 0.15;
+      this.radius = Math.random() * 1.5 + 1.2;
       this.flash = 0;
     }
     update() {
-      const speedMult = window.networkComplex ? 1.5 : 1;
+      const speedMult = window.networkComplex ? 1.4 : 1;
       this.x += this.vx * speedMult;
       this.y += this.vy * speedMult;
       if (this.x < 0 || this.x > w) this.vx *= -1;
       if (this.y < 0 || this.y > h) this.vy *= -1;
-      if (this.flash > 0) this.flash -= 0.02;
+      if (this.flash > 0) this.flash -= 0.015;
     }
-    draw() {
+    draw(pulse) {
       ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius + (this.flash * 2), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + this.flash})`;
+      const finalRadius = (this.radius + (this.flash * 3)) * pulse;
+      ctx.arc(this.x, this.y, finalRadius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${(0.5 + this.flash * 0.5) * pulse})`;
       ctx.fill();
-      if (this.flash > 0.3) {
-        ctx.shadowBlur = 15 * this.flash;
+      
+      if (this.flash > 0.2) {
+        ctx.shadowBlur = 12 * this.flash;
         ctx.shadowColor = '#fff';
       } else {
         ctx.shadowBlur = 0;
@@ -3531,12 +3533,14 @@ function initNetwork() {
 
   function draw() {
     ctx.clearRect(0, 0, w, h);
-    const currentMaxDist = window.networkComplex ? maxDist * 1.5 : maxDist;
+    const pulse = 0.8 + Math.sin(Date.now() / 2000) * 0.2; // Slow periodic pulse
+    const currentMaxDist = window.networkComplex ? maxDist * 1.3 : maxDist;
     
     for (let i = 0; i < particles.length; i++) {
       const p1 = particles[i];
       p1.update();
-      p1.draw();
+      p1.draw(pulse);
+      
       for (let j = i + 1; j < particles.length; j++) {
         const p2 = particles[j];
         const dx = p1.x - p2.x;
@@ -3544,15 +3548,17 @@ function initNetwork() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         
         if (dist < currentMaxDist) {
-          if (Math.random() < 0.0005) {
+          // Occasional flare
+          if (Math.random() < 0.0003) {
             p1.flash = 1;
             p2.flash = 1;
           }
           
           ctx.beginPath();
-          const alpha = (0.12 * (1 - dist / currentMaxDist)) * (1 + p1.flash);
+          const baseAlpha = 0.18 * (1 - dist / currentMaxDist);
+          const alpha = baseAlpha * pulse * (1 + p1.flash);
           ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-          ctx.lineWidth = 0.5;
+          ctx.lineWidth = 0.6;
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
           ctx.stroke();
