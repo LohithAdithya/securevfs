@@ -1159,7 +1159,9 @@ openIDB().then(hydrateFromIDB).catch(()=>{});
 // ROUTING
 // ================================================================
 function goToLogin() {
-  if (typeof initNetwork === 'function') window.networkComplex = true;
+  if (window.bgEngine && bgEngine.mode === 'network') {
+    bgEngine.setMode('network'); // Re-init with high density if desired, or just flag it
+  }
   document.getElementById('landing-screen').style.display='none';
   document.getElementById('login-screen').style.display='flex';
 }
@@ -3450,7 +3452,7 @@ async function generateComplianceReport() {
     const btn = document.getElementById('modal-confirm'); btn.textContent = 'Close'; btn.className = 'op-btn btn-neutral';
     modalCallback = () => closeModal();
     document.getElementById('modal').classList.add('open');
-    
+  } catch(e) {
     toast(e.message, 'error');
   }
 }
