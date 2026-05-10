@@ -572,6 +572,12 @@ async def list_files(username: str = "", is_admin: bool = False):
     db = load_db()
     result = []
     
+    # Verify admin claim against actual DB role (don't trust the client)
+    verified_admin = False
+    if is_admin and username:
+        user_data = db.get("users", {}).get(username, {})
+        verified_admin = user_data.get("role") in ["ADMIN", "DEVELOPER"]
+    
     # Lazily delete expired files
     for fid in list(db["files"].keys()):
         if check_ephemeral(db, db["files"][fid], fid):
@@ -580,11 +586,11 @@ async def list_files(username: str = "", is_admin: bool = False):
     for fid, meta in db["files"].items():
         pid = meta.get("project_id")
         if pid:
-            if is_admin or (username and get_member_role(db, pid, username) is not None):
+            if verified_admin or (username and get_member_role(db, pid, username) is not None):
                 proj = db["projects"].get(pid, {})
                 result.append({**meta, "project_name": proj.get("name", ""), "project_color": proj.get("color", "")})
         else:
-            if is_admin or not username or meta.get("encrypted_by") == username:
+            if verified_admin or not username or meta.get("encrypted_by") == username:
                 result.append({**meta, "project_name": None, "project_color": None})
     result.sort(key=lambda m: m.get("time", ""), reverse=True)
     return {"files": result, "count": len(result)}
@@ -630,11 +636,16 @@ async def delete_file(file_id: str, username: str = ""):
     if not meta:
         raise HTTPException(status_code=404, detail="File not found.")
 
+    # Admins can delete any file
+    user_role = db.get("users", {}).get(username, {}).get("role", "")
+    is_admin = user_role in ["ADMIN", "DEVELOPER"]
+
     pid = meta.get("project_id")
-    if pid and username:
-        require_member(db, pid, username, "editor")
-    elif username and meta.get("encrypted_by") != username:
-        raise HTTPException(status_code=403, detail="Only the uploader can delete this file.")
+    if not is_admin:
+        if pid and username:
+            require_member(db, pid, username, "editor")
+        elif username and meta.get("encrypted_by") != username:
+            raise HTTPException(status_code=403, detail="Only the uploader or an admin can delete this file.")
 
     blob_path = FILES_DIR / f"{fid}.enc"
     if blob_path.exists():
@@ -652,6 +663,12 @@ async def admin_decrypt_file(
     admin_username: str
 ):
     db = load_db()
+    
+    # Enforce admin role — only ADMIN/DEVELOPER can use admin decrypt
+    admin_user = db.get("users", {}).get(admin_username)
+    if not admin_user or admin_user.get("role") not in ["ADMIN", "DEVELOPER"]:
+        raise HTTPException(status_code=403, detail="Admin privileges required.")
+    
     fid = safe_id(file_id)
     if fid not in db["files"]:
         raise HTTPException(status_code=404, detail="File not found")
