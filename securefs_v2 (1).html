@@ -961,6 +961,23 @@ canvas{width:100%!important}
         </div>
 
         <div class="card">
+          <div class="card-label">Visual Effects</div>
+          <p style="font-size:13px; color:var(--muted); margin-bottom:14px; line-height:1.5;">Personalize your workspace aesthetic. Select a background style that matches your workflow.</p>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div class="field" style="margin-bottom:0; flex:1; min-width:200px;">
+              <select id="bg-style-select" onchange="bgEngine.setMode(this.value)" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; outline:none;">
+                <option value="network">⚡ Neural Network (Lightning)</option>
+                <option value="nebula">🌌 Data Nebula (Vibrant)</option>
+                <option value="parallax">📐 Geometric Parallax (Minimal)</option>
+                <option value="silk">🧵 Obsidian Silk (Original)</option>
+                <option value="terrain">🏔 Digital Terrain (Topographic)</option>
+              </select>
+            </div>
+            <button class="op-btn btn-action" onclick="bgEngine.triggerLightning()" id="lightning-test-btn">Strike Lightning</button>
+          </div>
+        </div>
+
+        <div class="card">
           <div class="card-label">Change Password</div>
           <div class="two-col">
             <div class="field"><label>Current Password</label><input type="password" id="set-old" placeholder="Current password"></div>
@@ -3478,101 +3495,262 @@ function nativeFullscreen() {
   if (isDesktop) window.pywebview.api.toggle_fullscreen();
 }
 
-// NEURAL NETWORK BACKGROUND
-window.networkComplex = false;
-function initNetwork() {
-  const canvas = document.getElementById('network-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let w, h;
-  const particles = [];
-  const particleCount = 100;
-  let maxDist = 180;
-
-  function resize() {
-    w = canvas.width = window.innerWidth;
-    h = canvas.height = window.innerHeight;
+// ================================================================
+// BACKGROUND ENGINE v3
+// ================================================================
+const bgEngine = new (class {
+  constructor() {
+    this.canvas = null;
+    this.ctx = null;
+    this.mode = localStorage.getItem('sfs_bg_style') || 'network';
+    this.w = 0; this.h = 0;
+    this.particles = [];
+    this.lightning = [];
+    this.offset = 0;
+    this.animationId = null;
+    this.parallaxPlanes = [];
   }
-  window.addEventListener('resize', resize);
-  resize();
 
-  class Particle {
-    constructor() {
-      this.x = Math.random() * w;
-      this.y = Math.random() * h;
-      this.vx = (Math.random() - 0.5) * 0.15; // Slow movement
-      this.vy = (Math.random() - 0.5) * 0.15;
-      this.radius = Math.random() * 1.5 + 1.2;
-      this.flash = 0;
+  init() {
+    this.canvas = document.getElementById('network-canvas');
+    if (!canvas) return;
+    this.ctx = this.canvas.getContext('2d');
+    
+    window.addEventListener('resize', () => this.resize());
+    this.resize();
+    
+    document.getElementById('bg-style-select').value = this.mode;
+    this.setMode(this.mode, true);
+    this.animate();
+  }
+
+  resize() {
+    this.w = this.canvas.width = window.innerWidth;
+    this.h = this.canvas.height = window.innerHeight;
+    if (this.mode === 'parallax') this.initParallax();
+  }
+
+  setMode(mode, initial = false) {
+    this.mode = mode;
+    localStorage.setItem('sfs_bg_style', mode);
+    
+    // Clear state
+    this.particles = [];
+    this.lightning = [];
+    this.parallaxPlanes = [];
+    this.offset = 0;
+    
+    const container = document.getElementById('particle-container') || document.querySelector('.mesh-bg');
+    if (container) {
+      container.innerHTML = '<canvas id="network-canvas"></canvas>';
+      this.canvas = document.getElementById('network-canvas');
+      this.ctx = this.canvas.getContext('2d');
+      this.resize();
     }
-    update() {
-      const speedMult = window.networkComplex ? 1.4 : 1;
-      this.x += this.vx * speedMult;
-      this.y += this.vy * speedMult;
-      if (this.x < 0 || this.x > w) this.vx *= -1;
-      if (this.y < 0 || this.y > h) this.vy *= -1;
-      if (this.flash > 0) this.flash -= 0.015;
+
+    if (mode === 'network') {
+      const count = 100;
+      for (let i = 0; i < count; i++) {
+        this.particles.push({
+          x: Math.random() * this.w,
+          y: Math.random() * this.h,
+          vx: (Math.random() - 0.5) * 0.05, // Semi-stationary
+          vy: (Math.random() - 0.5) * 0.05,
+          radius: Math.random() * 1.5 + 1.2,
+          flash: 0
+        });
+      }
+    } else if (mode === 'nebula') {
+      // Handled via CSS usually, but we can do a canvas version
+    } else if (mode === 'parallax') {
+      this.initParallax();
     }
-    draw(pulse) {
-      ctx.beginPath();
-      const finalRadius = (this.radius + (this.flash * 3)) * pulse;
-      ctx.arc(this.x, this.y, finalRadius, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${(0.5 + this.flash * 0.5) * pulse})`;
-      ctx.fill();
-      
-      if (this.flash > 0.2) {
-        ctx.shadowBlur = 12 * this.flash;
-        ctx.shadowColor = '#fff';
-      } else {
-        ctx.shadowBlur = 0;
+  }
+
+  initParallax() {
+    for (let i = 0; i < 8; i++) {
+      this.parallaxPlanes.push({
+        x: Math.random() * this.w,
+        y: Math.random() * this.h,
+        size: Math.random() * 400 + 200,
+        speed: Math.random() * 0.2 + 0.1,
+        opacity: Math.random() * 0.05 + 0.02,
+        rot: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  triggerLightning() {
+    if (this.mode !== 'network' || this.particles.length === 0) return;
+    let current = this.particles[Math.floor(Math.random() * this.particles.length)];
+    const path = [current];
+    for (let i = 0; i < 6; i++) {
+      let neighbors = this.particles.filter(p => !path.includes(p));
+      neighbors.sort((a, b) => {
+        const d1 = Math.hypot(a.x - current.x, a.y - current.y);
+        const d2 = Math.hypot(b.x - current.x, b.y - current.y);
+        return d1 - d2;
+      });
+      if (neighbors.length > 0) {
+        current = neighbors[Math.floor(Math.random() * 3) % neighbors.length];
+        path.push(current);
       }
     }
+    this.lightning.push({ path, life: 1.0 });
   }
 
-  for (let i = 0; i < particleCount; i++) particles.push(new Particle());
+  animate() {
+    this.ctx.clearRect(0, 0, this.w, this.h);
+    const pulse = 0.9 + Math.sin(Date.now() / 2500) * 0.1;
 
-  function draw() {
-    ctx.clearRect(0, 0, w, h);
-    const pulse = 0.8 + Math.sin(Date.now() / 2000) * 0.2; // Slow periodic pulse
-    const currentMaxDist = window.networkComplex ? maxDist * 1.3 : maxDist;
+    if (this.mode === 'network') {
+      this.drawNetwork(pulse);
+    } else if (this.mode === 'nebula') {
+      this.drawNebula();
+    } else if (this.mode === 'parallax') {
+      this.drawParallax();
+    } else if (this.mode === 'silk') {
+      this.drawSilk();
+    } else if (this.mode === 'terrain') {
+      this.drawTerrain();
+    }
+
+    requestAnimationFrame(() => this.animate());
+  }
+
+  drawNetwork(pulse) {
+    const ctx = this.ctx;
+    const maxDist = 180;
     
-    for (let i = 0; i < particles.length; i++) {
-      const p1 = particles[i];
-      p1.update();
-      p1.draw(pulse);
-      
-      for (let j = i + 1; j < particles.length; j++) {
-        const p2 = particles[j];
-        const dx = p1.x - p2.x;
-        const dy = p1.y - p2.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist < currentMaxDist) {
-          // Occasional flare
-          if (Math.random() < 0.0003) {
-            p1.flash = 1;
-            p2.flash = 1;
-          }
-          
+    // Auto lightning
+    if (Math.random() < 0.005) this.triggerLightning();
+
+    this.particles.forEach(p1 => {
+      p1.x += p1.vx; p1.y += p1.vy;
+      if (p1.x < 0 || p1.x > this.w) p1.vx *= -1;
+      if (p1.y < 0 || p1.y > this.h) p1.vy *= -1;
+      if (p1.flash > 0) p1.flash -= 0.02;
+
+      ctx.beginPath();
+      ctx.arc(p1.x, p1.y, (p1.radius + p1.flash * 2) * pulse, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${(0.4 + p1.flash) * pulse})`;
+      ctx.fill();
+    });
+
+    // Draw static connections
+    for (let i = 0; i < this.particles.length; i++) {
+      for (let j = i + 1; j < this.particles.length; j++) {
+        const p1 = this.particles[i];
+        const p2 = this.particles[j];
+        const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        if (d < maxDist) {
           ctx.beginPath();
-          const baseAlpha = 0.18 * (1 - dist / currentMaxDist);
-          const alpha = baseAlpha * pulse * (1 + p1.flash);
-          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-          ctx.lineWidth = 0.6;
+          ctx.strokeStyle = `rgba(255,255,255,${0.1 * (1 - d/maxDist) * pulse})`;
+          ctx.lineWidth = 0.5;
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
           ctx.stroke();
-          ctx.shadowBlur = 0;
         }
       }
     }
-    requestAnimationFrame(draw);
+
+    // Draw lightning pulses
+    this.lightning = this.lightning.filter(l => {
+      l.life -= 0.03;
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(255,255,255,${l.life * 0.8})`;
+      ctx.lineWidth = 2 * l.life;
+      ctx.shadowBlur = 15 * l.life;
+      ctx.shadowColor = '#fff';
+      l.path.forEach((p, idx) => {
+        if (idx === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+        p.flash = l.life;
+      });
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      return l.life > 0;
+    });
   }
-  draw();
-}
+
+  drawNebula() {
+    const ctx = this.ctx;
+    this.offset += 0.002;
+    const grad = ctx.createRadialGradient(this.w/2, this.h/2, 0, this.w/2, this.h/2, this.w);
+    grad.addColorStop(0, `rgba(59, 130, 246, ${0.1 * Math.sin(this.offset)})`);
+    grad.addColorStop(0.5, `rgba(139, 92, 246, ${0.05 * Math.cos(this.offset * 0.7)})`);
+    grad.addColorStop(1, '#000');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, this.w, this.h);
+  }
+
+  drawParallax() {
+    const ctx = this.ctx;
+    this.parallaxPlanes.forEach(p => {
+      p.rot += 0.001;
+      p.x += Math.cos(p.rot) * p.speed;
+      p.y += Math.sin(p.rot) * p.speed;
+      
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+      ctx.beginPath();
+      ctx.moveTo(-p.size/2, -p.size/2);
+      ctx.lineTo(p.size/2, -p.size/2);
+      ctx.lineTo(0, p.size/2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  drawSilk() {
+    const ctx = this.ctx;
+    this.offset += 0.005;
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      for (let x = 0; x < this.w; x += 10) {
+        const y = this.h/2 + Math.sin(x*0.002 + this.offset + i) * 200 * Math.cos(this.offset * 0.3);
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  drawTerrain() {
+    const ctx = this.ctx;
+    this.offset += 0.005;
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    const gap = 35;
+    const cols = 45;
+    const rows = 40;
+    const centerX = this.w / 2;
+    const centerY = this.h / 2;
+    
+    for (let j = 0; j < rows; j++) {
+      ctx.beginPath();
+      for (let i = 0; i < cols; i++) {
+        const x = (i - cols / 2) * gap + centerX;
+        const y_base = (j - rows / 2) * gap + centerY + 100;
+        const dist = Math.sqrt((i - cols / 2) ** 2 + (j - rows / 2) ** 2);
+        const z = Math.sin(i * 0.2 + this.offset) * Math.cos(j * 0.15 + this.offset * 0.8) * 40 * (1 - dist / 40);
+        const px = x;
+        const py = y_base - z - (j * 2);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+  }
+})();
 
 window.addEventListener('DOMContentLoaded', () => {
-  initNetwork();
+  init();
+  bgEngine.init();
 });
 </script>
 </body>
