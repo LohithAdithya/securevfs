@@ -301,7 +301,7 @@ tr:hover td{background:var(--surface2)}
 .cmp-unique-badge{font-size:11px;padding:4px 10px;border-radius:100px;background:var(--surface2);color:var(--text);font-weight:600}
 canvas{width:100%!important}
 
-/* VIBRANT MESH BACKGROUND */
+/* DIGITAL TERRAIN BACKGROUND */
 .mesh-bg {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
@@ -309,40 +309,10 @@ canvas{width:100%!important}
   background: #000;
   overflow: hidden;
 }
-.mesh-blob {
+#terrain-canvas {
   position: absolute;
-  width: 70vw; height: 70vw;
-  border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.25;
-  mix-blend-mode: screen;
-}
-.blob-1 {
-  background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
-  top: -20%; left: -10%;
-  animation: blobMove1 20s infinite alternate;
-}
-.blob-2 {
-  background: radial-gradient(circle, var(--purple) 0%, transparent 70%);
-  bottom: -20%; right: -10%;
-  animation: blobMove2 25s infinite alternate-reverse;
-}
-.blob-3 {
-  background: radial-gradient(circle, var(--cyan) 0%, transparent 70%);
-  top: 20%; right: 10%;
-  animation: blobMove3 18s infinite alternate;
-}
-@keyframes blobMove1 {
-  from { transform: translate(0, 0) scale(1); }
-  to { transform: translate(20%, 20%) scale(1.3); }
-}
-@keyframes blobMove2 {
-  from { transform: translate(0, 0) scale(1.1); }
-  to { transform: translate(-20%, -15%) scale(0.9); }
-}
-@keyframes blobMove3 {
-  from { transform: translate(0, 0) rotate(0deg); }
-  to { transform: translate(-10%, 10%) rotate(45deg); }
+  top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0.6;
 }
 
 /* PARTICLES */
@@ -460,10 +430,8 @@ canvas{width:100%!important}
 </head>
 <body oncontextmenu="return false" onkeydown="if(event.ctrlKey && (event.key==='u'||event.key==='s'))return false">
 
-<div class="mesh-bg" id="particle-container">
-  <div class="mesh-blob blob-1"></div>
-  <div class="mesh-blob blob-2"></div>
-  <div class="mesh-blob blob-3"></div>
+<div class="mesh-bg">
+  <canvas id="terrain-canvas"></canvas>
 </div>
 
 <div class="cursor-glow" id="cursor-glow"></div>
@@ -3488,39 +3456,80 @@ function nativeFullscreen() {
   if (isDesktop) window.pywebview.api.toggle_fullscreen();
 }
 
-// PARTICLE SYSTEM
-function initParticles() {
-  const container = document.getElementById('particle-container');
-  if (!container) return;
-  const count = 60;
-  for (let i = 0; i < count; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    const size = Math.random() * 2 + 1;
-    const x = Math.random() * 100;
-    const y = Math.random() * 100;
-    const dur = Math.random() * 8 + 6;
-    const delay = Math.random() * 15;
-    
-    p.style.width = `${size}px`;
-    p.style.height = `${size}px`;
-    p.style.left = `${x}%`;
-    p.style.top = `${y}%`;
-    p.style.animation = `particleFade ${dur}s linear ${delay}s infinite`;
-    
-    // Vary colors slightly
-    const colors = ['#3b82f6', '#06b6d4', '#ffffff'];
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    p.style.background = color;
-    p.style.boxShadow = `0 0 4px ${color}`;
-    
-    container.appendChild(p);
+// DIGITAL TERRAIN SYSTEM
+function initTerrain() {
+  const canvas = document.getElementById('terrain-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let w, h;
+  const cols = 45;
+  const rows = 40;
+  const gap = 35;
+  let offset = 0;
+
+  function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
   }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function draw() {
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(161, 161, 170, 0.25)';
+    ctx.lineWidth = 0.8;
+    
+    offset += 0.005;
+    
+    const centerX = w / 2;
+    const centerY = h / 2;
+    
+    // Draw horizontal lines
+    for (let j = 0; j < rows; j++) {
+      ctx.beginPath();
+      for (let i = 0; i < cols; i++) {
+        const x = (i - cols / 2) * gap + centerX;
+        const y_base = (j - rows / 2) * gap + centerY + 100;
+        
+        // Perspective effect
+        const dist = Math.sqrt((i - cols / 2) ** 2 + (j - rows / 2) ** 2);
+        const z = Math.sin(i * 0.2 + offset) * Math.cos(j * 0.15 + offset * 0.8) * 40 * (1 - dist / 40);
+        
+        const px = x;
+        const py = y_base - z - (j * 2); // Tilt effect
+        
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    
+    // Draw vertical lines
+    for (let i = 0; i < cols; i++) {
+      ctx.beginPath();
+      for (let j = 0; j < rows; j++) {
+        const x = (i - cols / 2) * gap + centerX;
+        const y_base = (j - rows / 2) * gap + centerY + 100;
+        const dist = Math.sqrt((i - cols / 2) ** 2 + (j - rows / 2) ** 2);
+        const z = Math.sin(i * 0.2 + offset) * Math.cos(j * 0.15 + offset * 0.8) * 40 * (1 - dist / 40);
+        
+        const px = x;
+        const py = y_base - z - (j * 2);
+        
+        if (j === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    
+    requestAnimationFrame(draw);
+  }
+  draw();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
   init();
-  initParticles();
+  initTerrain();
 });
 </script>
 </body>
