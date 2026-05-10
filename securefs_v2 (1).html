@@ -1,0 +1,3391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecureFS v2 — RBAC + Blockchain Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/fflate@0.8.0"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090b;--surface:#18181b;--surface2:#27272a;--surface3:#3f3f46;
+  --border:#27272a;--border2:#3f3f46;
+  --accent:#ffffff;--accent-dim:rgba(255,255,255,.05);--accent-glow:rgba(255,255,255,.1);
+  --primary:#3b82f6;--primary-dim:rgba(59,130,246,.1);--primary-hover:#2563eb;
+  --green:#10b981;--green-dim:rgba(16,185,129,.1);
+  --red:#ef4444;--red-dim:rgba(239,68,68,.1);
+  --amber:#f59e0b;--amber-dim:rgba(245,158,11,.1);
+  --purple:#8b5cf6;--purple-dim:rgba(139,92,246,.1);
+  --orange:#f97316;--orange-dim:rgba(249,115,22,.1);
+  --cyan:#06b6d4;--pink:#ec4899;
+  --text:#fafafa;--muted:#a1a1aa;--dim:#52525b;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 32px;border-bottom:1px solid var(--border);background:rgba(9,9,11,.8);backdrop-filter:blur(12px);position:sticky;top:0;z-index:200}
+.logo{display:flex;align-items:center;gap:12px;flex-shrink:0;cursor:pointer}
+.logo-mark{width:32px;height:32px;border-radius:8px;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600}
+.logo-text{font-weight:700;font-size:18px;letter-spacing:-0.5px;color:var(--text)}
+.logo-text .hi{color:var(--primary)}
+.logo-v2{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.header-mid{display:flex;align-items:center;gap:12px;flex:1;justify-content:center;font-size:12px}
+
+/* API STATUS */
+.api-status-pill{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:100px;border:1px solid;font-size:11px;font-weight:500;cursor:pointer;transition:all .2s;user-select:none}
+.api-status-pill.offline{background:var(--surface2);border-color:var(--border);color:var(--muted)}
+.api-status-pill.online{background:var(--green-dim);border-color:rgba(16,185,129,.2);color:var(--green)}
+.api-status-pill.checking{background:var(--primary-dim);border-color:rgba(59,130,246,.2);color:var(--primary)}
+.api-status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:all .3s}
+.api-status-dot.offline{background:var(--muted)}
+.api-status-dot.online{background:var(--green);box-shadow:0 0 6px var(--green)}
+.api-status-dot.checking{background:var(--primary);animation:pulse 1s infinite}
+.api-mode-toggle{display:flex;align-items:center;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:4px;font-size:11px}
+.api-mode-btn{padding:4px 12px;border-radius:100px;cursor:pointer;transition:all .2s;font-weight:500;color:var(--muted);border:none;background:transparent;font-family:inherit;font-size:11px}
+.api-mode-btn.active{background:var(--surface3);color:var(--text)}
+.chain-dot{width:6px;height:6px;border-radius:50%;background:var(--orange);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.header-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.user-chip{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:4px 14px 4px 4px}
+.avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+.chip-name{font-size:13px;font-weight:500}
+.role-tag{font-size:10px;padding:2px 8px;border-radius:100px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.desktop-badge{display:none;background:linear-gradient(135deg, var(--primary), var(--purple));color:white;font-size:9px;padding:2px 10px;border-radius:4px;margin-left:10px;font-weight:700;text-transform:uppercase;box-shadow:0 0 10px rgba(59,130,246,0.3)}
+.desktop-mode .desktop-badge{display:inline-block}
+.role-DEVELOPER{background:rgba(59,130,246,.15);color:var(--primary)}
+.role-ADMIN{background:rgba(245,158,11,.15);color:var(--amber)}
+.role-MANAGER{background:rgba(139,92,246,.15);color:var(--purple)}
+.role-USER{background:rgba(16,185,129,.15);color:var(--green)}
+.role-AUDITOR{background:rgba(6,182,212,.15);color:var(--cyan)}
+.role-READ_ONLY{background:rgba(161,161,170,.15);color:var(--muted)}
+.av-DEVELOPER{background:rgba(59,130,246,.2);color:var(--primary)}
+.av-ADMIN{background:rgba(245,158,11,.2);color:var(--amber)}
+.av-MANAGER{background:rgba(139,92,246,.2);color:var(--purple)}
+.av-USER{background:rgba(16,185,129,.2);color:var(--green)}
+.av-AUDITOR{background:rgba(6,182,212,.2);color:var(--cyan)}
+.av-READ_ONLY{background:rgba(161,161,170,.2);color:var(--muted)}
+
+/* LANDING PAGE */
+#landing-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px;text-align:center;animation:fadeUp 0.6s ease both}
+.landing-hero{max-width:800px;margin:0 auto 60px}
+.landing-title{font-size:56px;font-weight:700;letter-spacing:-1.5px;margin-bottom:24px;line-height:1.1;background:linear-gradient(to right, #fff, #a1a1aa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.landing-subtitle{font-size:20px;color:var(--muted);line-height:1.6;margin-bottom:48px;max-width:640px;margin-left:auto;margin-right:auto}
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:16px 32px;background:var(--text);color:var(--bg);border:none;border-radius:8px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none}
+.btn-primary:hover{transform:translateY(-2px);background:#e4e4e7}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;max-width:1100px;margin:0 auto;width:100%}
+.feature-card{background:rgba(24,24,27,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.05);border-radius:16px;padding:32px;text-align:left;transition:all .4s cubic-bezier(0.4, 0, 0.2, 1);box-shadow:0 10px 30px rgba(0,0,0,0.1)}
+.feature-card:hover{border-color:rgba(255,255,255,0.15);transform:translateY(-8px);box-shadow:0 20px 40px rgba(0,0,0,0.4);background:rgba(24,24,27,0.8)}
+.feature-icon{font-size:24px;margin-bottom:20px;width:48px;height:48px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 1px rgba(255,255,255,0.1)}
+.feature-title{font-size:18px;font-weight:600;margin-bottom:12px;color:var(--text);letter-spacing:-0.3px}
+.feature-desc{font-size:14px;color:var(--muted);line-height:1.7}
+
+/* LOGIN */
+#login-screen{flex:1;display:none;align-items:center;justify-content:center;padding:40px 20px}
+.login-wrap{width:100%;max-width:400px}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;animation:fadeUp .4s ease both}
+.login-card h2{font-size:24px;font-weight:700;margin-bottom:8px;letter-spacing:-0.5px}
+.login-sub{font-size:14px;color:var(--muted);margin-bottom:32px;line-height:1.6}
+.ids-banner, .blockchain-badge{display:flex;gap:12px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);margin-bottom:24px;line-height:1.5;align-items:flex-start}
+.ids-banner span:first-child{color:var(--red)}
+.blockchain-badge span:first-child{color:var(--orange)}
+.field{margin-bottom:20px}
+label{display:block;font-size:12px;font-weight:500;color:var(--text);margin-bottom:8px}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:all .2s;-webkit-appearance:none}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-dim)}
+input[type=password]{font-family:'JetBrains Mono',monospace;letter-spacing:1px}
+.btn-login{width:100%;padding:14px;background:var(--text);color:var(--bg);border:none;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;margin-top:8px}
+.btn-login:hover{background:#e4e4e7}
+.setup-hint{margin-top:24px;font-size:12px;color:var(--muted);text-align:center;line-height:1.8}
+
+/* PASSWORD STRENGTH */
+.pw-strength{margin-top:8px;height:4px;border-radius:100px;background:var(--surface2);overflow:hidden}
+.pw-strength-bar{height:100%;border-radius:100px;transition:all .3s;width:0}
+.pw-strength-label{font-size:11px;color:var(--muted);margin-top:6px;font-weight:500}
+
+/* MAIN */
+#main-screen{display:none;flex:1;min-height:0}
+.layout{display:flex;flex:1;min-height:0;height:calc(100vh - 65px);padding:24px;gap:24px}
+
+/* SIDEBAR */
+.sidebar{width:260px;background:rgba(24,24,27,0.4);backdrop-filter:blur(32px);border:1px solid rgba(255,255,255,0.08);padding:24px 16px;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;z-index:10;border-radius:24px;box-shadow:0 20px 40px rgba(0,0,0,0.4)}
+.sidebar-section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--dim);padding:0 12px;margin:24px 0 8px}
+.sidebar-section-label:first-child{margin-top:0}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:all .15s;user-select:none;margin-bottom:2px}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--surface2);color:var(--text)}
+.nav-icon{font-size:14px;width:20px;text-align:center;flex-shrink:0}
+.nav-badge{margin-left:auto;font-size:10px;font-weight:600;padding:2px 8px;border-radius:100px;background:var(--surface3);color:var(--text)}
+.sidebar-spacer{flex:1}
+.nav-item.danger{color:var(--red)}
+.nav-item.danger:hover{background:var(--red-dim);color:var(--red)}
+
+/* CONTENT */
+.content{flex:1;padding:0;overflow-y:auto;min-width:0;background:transparent;position:relative;z-index:2}
+.panel{display:none;animation:fadeUp .3s ease both}
+.panel.active{display:block;max-width:1200px;margin:0 auto}
+.panel-header{margin-bottom:32px;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.panel-title{font-size:24px;font-weight:700;margin-bottom:8px;letter-spacing:-0.5px}
+.panel-desc{font-size:14px;color:var(--muted);line-height:1.6}
+.panel-actions{display:flex;gap:12px;flex-shrink:0;flex-wrap:wrap}
+
+/* CARDS */
+.card{background:rgba(24,24,27,0.4);backdrop-filter:blur(32px);border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:32px;margin-bottom:24px;box-shadow:0 20px 40px rgba(0,0,0,0.3);transition:all .3s cubic-bezier(0.4, 0, 0.2, 1)}
+.card:hover{border-color:rgba(255,255,255,0.15);box-shadow:0 30px 60px rgba(0,0,0,0.5);transform:translateY(-4px)}
+.card-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px}
+
+/* FILE DROP */
+.file-drop{border:1px dashed var(--dim);border-radius:8px;padding:40px 24px;text-align:center;cursor:pointer;transition:all .2s;position:relative;margin-bottom:20px;background:var(--bg)}
+.file-drop:hover,.file-drop.dragover{border-color:var(--muted);background:var(--surface2)}
+.file-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-size:32px;margin-bottom:12px}
+.drop-text{font-size:14px;color:var(--muted)}
+.drop-text strong{color:var(--text);font-weight:500}
+.drop-name{font-size:13px;color:var(--text);margin-top:12px;font-weight:500;word-break:break-all}
+.drop-meta{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* BUTTONS */
+.actions{display:flex;gap:12px;margin-top:24px;flex-wrap:wrap;align-items:center}
+.op-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:8px;border:1px solid transparent;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;transition:all .2s;white-space:nowrap}
+.op-btn:hover{transform:translateY(-1px)}
+.op-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.btn-encrypt{background:var(--text);color:var(--bg)}
+.btn-encrypt:hover{background:#e4e4e7}
+.btn-decrypt{background:var(--surface2);color:var(--text);border-color:var(--border)}
+.btn-decrypt:hover{background:var(--surface3)}
+.btn-verify{background:var(--surface2);color:var(--text);border-color:var(--border)}
+.btn-verify:hover{background:var(--surface3)}
+.btn-action{background:var(--surface2);color:var(--text);border-color:var(--border)}
+.btn-action:hover{background:var(--surface3)}
+.btn-danger{background:var(--red-dim);color:var(--red);border-color:rgba(239,68,68,.2)}
+.btn-danger:hover{background:rgba(239,68,68,.15)}
+.btn-neutral{background:transparent;color:var(--text);border-color:var(--border)}
+.btn-neutral:hover{background:var(--surface2)}
+.btn-orange{background:var(--surface2);color:var(--text);border-color:var(--border)}
+.btn-orange:hover{background:var(--surface3)}
+
+/* RESULT BOX */
+.result-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;margin-top:24px;font-size:13px;line-height:1.8;display:none}
+.result-box.visible{display:block;animation:fadeUp .3s ease both}
+.r-row{display:flex;gap:16px;align-items:flex-start;margin-bottom:8px}
+.r-k{color:var(--muted);min-width:140px;flex-shrink:0;font-weight:500}
+.r-v{color:var(--text);word-break:break-all}
+.r-ok{color:var(--green)}
+.r-fail{color:var(--red)}
+.dl-link{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-weight:500;text-decoration:none;cursor:pointer;margin-top:16px;transition:all .2s}
+.dl-link:hover{background:var(--surface3)}
+.chain-link{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;text-decoration:none;cursor:pointer;margin-top:16px;transition:all .2s}
+.chain-link:hover{background:var(--surface3)}
+
+/* INFO BOX */
+.info-box, .warn-box{display:flex;gap:12px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);margin-bottom:24px;line-height:1.6}
+.info-box-icon, .warn-box-icon{color:var(--muted);flex-shrink:0;font-size:16px}
+
+/* TABLES */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:12px;font-weight:500;color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:16px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+.tbl-actions{display:flex;gap:8px;flex-wrap:wrap}
+.tbl-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;background:var(--surface);color:var(--text);transition:all .2s;white-space:nowrap}
+.tbl-btn:hover{background:var(--surface2)}
+.mono-hash{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);word-break:break-all}
+
+/* BADGES */
+.badge-locked, .badge-invalid{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:500;background:var(--red-dim);color:var(--red)}
+.badge-active, .badge-valid{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:500;background:var(--green-dim);color:var(--green)}
+.badge-chain{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:500;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:32px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px}
+.stat-val{font-size:32px;font-weight:700;margin-bottom:8px;line-height:1;letter-spacing:-0.5px;color:var(--text)}
+.stat-label{font-size:12px;font-weight:500;color:var(--muted)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:24px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width:480px;animation:scaleIn .3s ease both;max-height:90vh;overflow-y:auto;box-shadow:0 20px 40px rgba(0,0,0,0.4)}
+.modal.wide{max-width:720px}
+.modal h3{font-size:20px;font-weight:700;margin-bottom:24px;letter-spacing:-0.5px}
+.modal-actions{display:flex;gap:12px;margin-top:32px;justify-content:flex-end;flex-wrap:wrap}
+
+/* TOAST */
+.toast-wrap{position:fixed;bottom:32px;right:32px;z-index:999;display:flex;flex-direction:column;gap:12px}
+.toast{display:flex;align-items:center;gap:12px;padding:16px 20px;border-radius:12px;font-size:13px;font-weight:500;min-width:300px;max-width:400px;background:var(--surface);border:1px solid var(--border);box-shadow:0 10px 30px rgba(0,0,0,0.3);animation:slideIn .3s ease both;line-height:1.5}
+.toast.success{border-left:4px solid var(--green)}
+.toast.error{border-left:4px solid var(--red)}
+.toast.info{border-left:4px solid var(--primary)}
+.toast.warn{border-left:4px solid var(--amber)}
+.t-icon{font-size:16px;flex-shrink:0}
+
+/* BLOCKCHAIN SPECIFIC */
+.chain-explorer{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.block-card{padding:20px;border-bottom:1px solid var(--border);transition:background .2s}
+.block-card:last-child{border-bottom:none}
+.block-card:hover{background:var(--surface2)}
+.block-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.block-num{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;padding:4px 8px;border-radius:6px;background:var(--surface2);color:var(--text)}
+.block-action{font-size:12px;font-weight:600;color:var(--text)}
+.block-time{font-size:12px;color:var(--muted);margin-left:auto}
+.block-hashes{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:8px}
+.block-hash-row{font-size:11px;color:var(--muted)}
+.block-hash-label{color:var(--dim);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;font-weight:500}
+.block-hash-val{color:var(--muted);word-break:break-all;font-family:'JetBrains Mono',monospace}
+.chain-summary{display:flex;align-items:center;gap:24px;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:24px;flex-wrap:wrap}
+.chain-stat{text-align:center}
+.chain-stat-val{font-size:24px;font-weight:700;color:var(--text);margin-bottom:4px}
+.chain-stat-label{font-size:12px;font-weight:500;color:var(--muted)}
+
+/* FILE REGISTRY */
+.registry-item{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.registry-item:last-child{border-bottom:none}
+.registry-icon{font-size:24px;flex-shrink:0;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:8px}
+.registry-info{flex:1;min-width:0}
+.registry-name{font-size:14px;font-weight:600;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.registry-meta{font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+.registry-hash{font-size:11px;color:var(--dim);margin-top:6px;font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.registry-actions{display:flex;gap:8px;flex-shrink:0}
+
+/* COMPARISON PANEL */
+.cmp-metric-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+.cmp-metric{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px}
+.cmp-metric-val{font-size:32px;font-weight:700;line-height:1;margin-bottom:8px;letter-spacing:-1px;color:var(--text)}
+.cmp-metric-label{font-size:12px;font-weight:500;color:var(--muted);margin-bottom:4px}
+.cmp-metric-sub{font-size:12px;color:var(--dim)}
+.cmp-section-label{font-size:14px;font-weight:600;color:var(--text);margin:32px 0 16px}
+.cmp-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}
+.cmp-grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:24px}
+.cmp-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px}
+.cmp-chart-title{font-size:16px;font-weight:600;margin-bottom:8px}
+.cmp-chart-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+.proj-mini{background:var(--surface2);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.proj-mini-head{display:flex;align-items:center;gap:12px}
+.proj-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.proj-mini-name{font-size:13px;font-weight:600;color:var(--text)}
+.proj-mini-sub{font-size:11px;color:var(--muted)}
+.proj-tags{display:flex;flex-wrap:wrap;gap:6px}
+.proj-tag{font-size:10px;padding:4px 8px;border-radius:6px;background:var(--surface3);color:var(--muted)}
+.proj-bars{display:flex;flex-direction:column;gap:8px}
+.proj-bar-row{display:flex;align-items:center;gap:8px;font-size:11px}
+.proj-bar-label{color:var(--muted);width:60px;flex-shrink:0}
+.proj-bar-track{flex:1;height:6px;background:var(--surface3);border-radius:100px;overflow:hidden}
+.proj-bar-fill{height:100%;border-radius:100px;transition:width 1s ease-out}
+.proj-bar-val{font-size:11px;color:var(--text);width:24px;text-align:right}
+.cmp-feat-table{width:100%;border-collapse:collapse;font-size:13px}
+.cmp-feat-table th{padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:var(--surface2);white-space:nowrap}
+.cmp-feat-table td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--muted)}
+.cmp-feat-table td:first-child{color:var(--text);font-weight:500}
+.cft-check{color:var(--text);font-weight:700}
+.cft-cross{color:var(--dim)}
+.cft-part{color:var(--muted)}
+.cmp-score-row{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.cmp-score-label{font-size:13px;color:var(--muted);min-width:140px;text-align:right}
+.cmp-score-track{flex:1;height:8px;background:var(--surface3);border-radius:100px;overflow:hidden}
+.cmp-score-bar{height:100%;border-radius:100px}
+.cmp-score-val{font-size:13px;font-weight:600;color:var(--text);width:32px;text-align:right}
+.cmp-winner{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px;background:var(--surface2);color:var(--text);border:1px solid var(--border);margin-left:8px}
+.cmp-insight{background:var(--surface2);border-radius:12px;padding:20px 24px;font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:24px}
+.cmp-insight strong{color:var(--text);font-weight:600}
+.cmp-unique-item{display:flex;align-items:center;gap:16px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:13px;margin-bottom:12px}
+.cmp-unique-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.cmp-unique-label{flex:1;color:var(--muted);line-height:1.5}
+.cmp-unique-label strong{color:var(--text);font-weight:600}
+.cmp-unique-badge{font-size:11px;padding:4px 10px;border-radius:100px;background:var(--surface2);color:var(--text);font-weight:600}
+canvas{width:100%!important}
+
+/* MISC */
+.empty{text-align:center;padding:60px 24px;color:var(--muted)}
+.empty-icon{font-size:40px;margin-bottom:16px;opacity:0.5}
+.empty-txt{font-size:14px;line-height:1.6}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:currentColor;border-radius:50%;animation:spin .8s linear infinite}
+.divider{height:1px;background:var(--border);margin:24px 0}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.input-row{display:flex;gap:12px;align-items:flex-end}
+.input-row .field{flex:1;margin-bottom:0}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+/* FLOWCHARTS CSS */
+.flow-section { max-width: 1100px; margin: 80px auto; text-align: center; position: relative; z-index: 1; padding: 0 24px; }
+.flow-title { font-size: 40px; font-weight: 700; margin-bottom: 16px; letter-spacing: -1px; background: linear-gradient(to right, #fff, #a1a1aa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.flow-desc { font-size: 16px; color: var(--muted); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto; line-height: 1.6; }
+.flow-container { background: rgba(24,24,27,0.4); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.05); border-radius: 24px; padding: 48px; margin-bottom: 32px; position: relative; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 20px 40px rgba(0,0,0,0.3); }
+.flow-container::before { content:''; position:absolute; inset:0; background: radial-gradient(circle at 50% -20%, rgba(59,130,246,0.1), transparent 70%); pointer-events: none; }
+.flow-container.amber::before { background: radial-gradient(circle at 50% -20%, rgba(245,158,11,0.1), transparent 70%); }
+.flow-grid { display: flex; align-items: stretch; justify-content: center; gap: 16px; flex-wrap: wrap; position:relative; z-index:2; }
+.flow-step { background: rgba(39,39,42,0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 32px 24px; width: 260px; text-align: center; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display:flex; flex-direction:column; justify-content:center; }
+.flow-step:hover { transform: translateY(-8px); border-color: rgba(255,255,255,0.15); background: rgba(39,39,42,0.8); box-shadow: 0 16px 32px rgba(0,0,0,0.3); }
+.flow-icon { font-size: 40px; margin-bottom: 20px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); }
+.flow-label { font-weight: 600; color: var(--text); margin-bottom: 12px; font-size: 16px; letter-spacing: -0.3px; }
+.flow-detail { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.flow-arrow { display: flex; align-items: center; justify-content: center; width: 40px; position: relative; }
+.flow-arrow-line { position: absolute; top: 50%; left: -10px; right: -10px; height: 2px; background: rgba(255,255,255,0.05); transform: translateY(-50%); overflow: hidden; border-radius: 2px; }
+.flow-arrow-line::after { content:''; position:absolute; top:0; left:0; width:40%; height:100%; background: linear-gradient(90deg, transparent, var(--primary), transparent); animation: flowBeam 2s infinite linear; }
+.flow-container.amber .flow-arrow-line::after { background: linear-gradient(90deg, transparent, var(--amber), transparent); }
+@keyframes flowBeam { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+
+/* AMBIENT CURSOR GLOW */
+.cursor-glow {
+  position: fixed;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59,130,246,0.12) 0%, rgba(0,0,0,0) 60%);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  transition: opacity 0.3s;
+  mix-blend-mode: screen;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+/* PREMIUM AMBIENT MESH BACKGROUND */
+.bg-anim { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: radial-gradient(circle at 50% 0%, #1a1a24 0%, #09090b 70%); }
+.bg-mesh { position: absolute; filter: blur(120px); border-radius: 50%; opacity: 0.5; mix-blend-mode: screen; animation: meshRotate 30s infinite linear; }
+.mesh-1 { width: 80vw; height: 80vw; background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 60%); top: -40vw; left: -20vw; transform-origin: 60% 60%; }
+.mesh-2 { width: 70vw; height: 70vw; background: radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 60%); bottom: -30vw; right: -10vw; transform-origin: 30% 30%; animation-direction: reverse; animation-duration: 40s; }
+.mesh-3 { width: 60vw; height: 60vw; background: radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 60%); top: 20vh; left: 20vw; transform-origin: 70% 30%; animation-duration: 50s; }
+
+@keyframes meshRotate { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.1); } 100% { transform: rotate(360deg) scale(1); } }
+
+/* MOBILE RESPONSIVE */
+@media (max-width: 800px) {
+  .layout { flex-direction: column; height: auto; min-height: 100vh; padding: 12px; gap: 16px; }
+  .sidebar { width: 100%; max-height: 250px; padding: 16px; border-radius: 16px; flex-shrink: 0; box-sizing: border-box; }
+  .content { padding: 0; overflow: visible; width: 100%; box-sizing: border-box; }
+  header { padding: 12px 16px; flex-wrap: wrap; gap: 12px; height: auto; }
+  .header-mid { flex-wrap: wrap; order: 3; width: 100%; justify-content: flex-start; border-left: none !important; padding-left: 0 !important; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px; margin-top: 4px; }
+  .two-col { grid-template-columns: 1fr; gap: 16px; }
+  .landing-hero { text-align: center; padding: 0 16px; width: 100%; box-sizing: border-box; margin-bottom: 32px; }
+  .landing-title { font-size: 36px; margin-bottom: 16px; }
+  .landing-subtitle { font-size: 16px; margin-bottom: 24px; }
+  .btn-primary { width: 100%; justify-content: center; margin-bottom: 16px; }
+  .features-grid { grid-template-columns: 1fr; gap: 16px; padding: 0 16px; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: stretch; }
+  .feature-card { width: 100%; box-sizing: border-box; }
+  .cmp-metric-row { flex-direction: column; gap: 16px; }
+  .cmp-grid-5 { grid-template-columns: 1fr; gap: 16px; display: flex; flex-direction: column; }
+  .cmp-grid-2 { grid-template-columns: 1fr; gap: 16px; display: flex; flex-direction: column; }
+  .cmp-feat-table { display: block; overflow-x: auto; white-space: nowrap; }
+  .flow-section { padding: 0 16px; width: 100%; box-sizing: border-box; overflow-x: hidden; margin: 40px auto; }
+  .flow-grid { flex-direction: column; gap: 16px; align-items: stretch; }
+  .flow-step { width: 100%; box-sizing: border-box; }
+  .flow-arrow { transform: rotate(90deg); margin: 8px auto; width: 20px; }
+  .modal { padding: 24px; width: calc(100% - 24px); max-height: 85vh; }
+  .card { padding: 20px; border-radius: 16px; }
+  #chain-canvas { height: 140px; }
+  .input-row { flex-direction: column; align-items: stretch; }
+  .input-row button { margin-top: 8px; }
+  .nav-item { padding: 8px 12px; }
+}
+
+/* TERMINAL MODE */
+#terminal-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
+  z-index: 9999; display: none; flex-direction: column;
+  font-family: 'JetBrains Mono', monospace;
+}
+#terminal-overlay.open { display: flex; }
+#terminal-header { background: #18181b; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #27272a; }
+#terminal-output { flex: 1; padding: 20px; overflow-y: auto; color: #a1a1aa; font-size: 13px; line-height: 1.6; }
+#terminal-input-row { display: flex; padding: 20px; background: #09090b; border-top: 1px solid #27272a; align-items: center; }
+#terminal-prompt { color: #34d399; margin-right: 10px; font-weight: bold; }
+#terminal-input { flex: 1; background: transparent; border: none; color: #fff; font-family: inherit; font-size: 14px; outline: none; }
+.term-cmd { color: #fff; font-weight: bold; }
+.term-err { color: #f87171; }
+.term-succ { color: #34d399; }
+.term-warn { color: #fbbf24; }
+</style>
+
+
+</head>
+<body>
+<div id="cursor-glow" class="cursor-glow"></div>
+<div class="bg-anim">
+  <div class="bg-mesh mesh-1"></div>
+  <div class="bg-mesh mesh-2"></div>
+  <div class="bg-mesh mesh-3"></div>
+</div>
+<div class="app">
+<header>
+  <div class="logo">
+    <div class="logo-mark">🛡</div>
+    <div class="logo-text">SECURE<span>FS</span></div>
+    <div class="desktop-badge">Native Desktop Pro</div>
+    <span class="logo-v2">v2</span>
+  </div>
+  <div class="header-mid" id="header-chain" style="display:none">
+    <div class="api-status-pill offline" id="api-pill" onclick="toggleApiConfig()" title="Click to configure backend URL">
+      <div class="api-status-dot offline" id="api-dot"></div>
+      <span id="api-pill-text">Backend Offline</span>
+    </div>
+    <div class="api-mode-toggle" id="api-mode-toggle" style="display:none">
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;border-left:1px solid var(--border);padding-left:10px">
+      <div class="chain-dot" id="chain-status-dot"></div>
+      <span style="color:var(--orange);font-size:11px">Chain</span>
+      <span id="chain-block-count" style="color:var(--muted);font-size:11px"></span>
+    </div>
+  </div>
+  <div class="header-right" id="header-user" style="display:none"></div>
+</header>
+
+<!-- LOGIN -->
+<!-- LANDING PAGE -->
+<div id="landing-screen">
+  <div class="landing-hero">
+    <h1 class="landing-title">About the Project</h1>
+    <p class="landing-subtitle">SecureFS v2 is a modern, enterprise-grade file encryption system built on AES-256-GCM. It features identity-bound encryption, an immutable blockchain audit ledger, and intrusion detection—all operating seamlessly in your browser or through our Python backend.</p>
+    <button class="btn-primary" onclick="goToLogin()">Get Started →</button>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🔒</div>
+      <div class="feature-title">AES-256-GCM Encryption</div>
+      <div class="feature-desc">Military-grade authenticated encryption. Files are cryptographically bound to your identity, ensuring only authorized personnel can decrypt them.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">👥</div>
+      <div class="feature-title">Role-Based Access</div>
+      <div class="feature-desc">Six distinct roles from Auditor to Admin. Granular permissions dictate who can encrypt, decrypt, verify, or manage users across the system.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⛓</div>
+      <div class="feature-title">Blockchain Audit Ledger</div>
+      <div class="feature-desc">Every action is recorded in an immutable, cryptographically linked chain of blocks. Any tampering attempt is mathematically detectable.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🛡</div>
+      <div class="feature-title">Intrusion Detection</div>
+      <div class="feature-desc">Active monitoring automatically locks user accounts after multiple failed authentication attempts, securing your data against brute-force attacks.</div>
+    </div>
+  </div>
+
+  <!-- FLOWCHARTS SECTION -->
+  <div class="flow-section">
+    <h2 class="flow-title">How It Works</h2>
+    <p class="flow-desc">SecureFS integrates advanced encryption, identity management, and blockchain auditing into a single seamless flow.</p>
+    
+    <div class="flow-container">
+      <div style="font-size:12px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:1px;margin-bottom:32px;text-align:left;display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:rgba(59,130,246,0.2);color:var(--primary);text-align:center;line-height:24px;">1</span> Identity-Bound Encryption</div>
+      <div class="flow-grid">
+        <div class="flow-step">
+          <div class="flow-icon">👤</div>
+          <div class="flow-label">User Identity</div>
+          <div class="flow-detail">Username and Employee ID form the Additional Authenticated Data (AAD), uniquely binding the file to you.</div>
+        </div>
+        <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+        <div class="flow-step">
+          <div class="flow-icon">🔑</div>
+          <div class="flow-label">Key Derivation</div>
+          <div class="flow-detail">A secure Session Key is derived using PBKDF2-SHA256 with 100,000 iterations to resist brute-force attacks.</div>
+        </div>
+        <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+        <div class="flow-step">
+          <div class="flow-icon">🛡</div>
+          <div class="flow-label">AES-256-GCM</div>
+          <div class="flow-detail">The file is encrypted with military-grade AES-256-GCM. Any modification instantly breaks the integrity tag.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-container amber">
+      <div style="font-size:12px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:1px;margin-bottom:32px;text-align:left;display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:rgba(245,158,11,0.2);color:var(--amber);text-align:center;line-height:24px;">2</span> Immutable Audit Trail</div>
+      <div class="flow-grid">
+        <div class="flow-step">
+          <div class="flow-icon">⚡</div>
+          <div class="flow-label">Action Triggered</div>
+          <div class="flow-detail">A sensitive operation such as Encrypt, Decrypt, or Verify is performed by a logged-in user.</div>
+        </div>
+        <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+        <div class="flow-step">
+          <div class="flow-icon">🔗</div>
+          <div class="flow-label">Hash Linking</div>
+          <div class="flow-detail">The action metadata is combined and hashed alongside the previous block's SHA-256 hash.</div>
+        </div>
+        <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+        <div class="flow-step">
+          <div class="flow-icon">⛓</div>
+          <div class="flow-label">New Block Mined</div>
+          <div class="flow-detail">An immutable ledger record is created. Retroactive tampering mathematically breaks the entire chain.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+      <!-- COMPARE -->
+      <div id="panel-compare" style="max-width:1100px; margin: 60px auto; padding: 0 20px; box-sizing: border-box; overflow: hidden; width: 100%;">
+        <div class="panel-header" style="margin-bottom: 30px;">
+          <div class="panel-header-text">
+            <div class="panel-title">Competitive Benchmarks</div>
+            <div class="panel-desc">How SecureFS v2 compares to 4 real-world encryption tools across security, features, usability and more.</div>
+          </div>
+        </div>
+        <div class="cmp-metric-row">
+          <div class="cmp-metric"><div class="cmp-metric-val" style="color:var(--accent)">6</div><div class="cmp-metric-label">RBAC Roles</div><div class="cmp-metric-sub">Avg 0 in comparable tools</div></div>
+          <div class="cmp-metric"><div class="cmp-metric-val" style="color:var(--green)">AES-256</div><div class="cmp-metric-label">Cipher + GCM Mode</div><div class="cmp-metric-sub">AEAD - tamper-proof</div></div>
+          <div class="cmp-metric"><div class="cmp-metric-val" style="color:var(--amber)">100K</div><div class="cmp-metric-label">PBKDF2 Iterations</div><div class="cmp-metric-sub">Industry-standard minimum</div></div>
+          <div class="cmp-metric"><div class="cmp-metric-val" style="color:var(--orange)">16/17</div><div class="cmp-metric-label">Feature Score</div><div class="cmp-metric-sub">+Blockchain in v2</div></div>
+        </div>
+        <div class="cmp-section-label">Projects Compared</div>
+        <div class="cmp-grid-5">
+          <div class="proj-mini">
+            <div class="proj-mini-head"><div class="proj-dot" style="background:#38bdf8"></div><div><div class="proj-mini-name">SecureFS v2</div><div class="proj-mini-sub">This project</div></div></div>
+            <div class="proj-tags"><span class="proj-tag">Python+Browser</span><span class="proj-tag">RBAC</span><span class="proj-tag">Blockchain</span></div>
+            <div class="proj-bars">
+              <div class="proj-bar-row"><span class="proj-bar-label">Security</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:94%;background:#38bdf8"></div></div><span class="proj-bar-val">94</span></div>
+              <div class="proj-bar-row"><span class="proj-bar-label">Features</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:97%;background:#38bdf8"></div></div><span class="proj-bar-val">97</span></div>
+              <div class="proj-bar-row"><span class="proj-bar-label">Usability</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:88%;background:#38bdf8"></div></div><span class="proj-bar-val">88</span></div>
+            </div>
+          </div>
+          <div class="proj-mini">
+            <div class="proj-mini-head"><div class="proj-dot" style="background:#f472b6"></div><div><div class="proj-mini-name">VaultMan</div><div class="proj-mini-sub">CLI password manager</div></div></div>
+            <div class="proj-tags"><span class="proj-tag">Python</span><span class="proj-tag">AES-128</span><span class="proj-tag">No RBAC</span></div>
+            <div class="proj-bars">
+              <div class="proj-bar-row"><span class="proj-bar-label">Security</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:60%;background:#f472b6"></div></div><span class="proj-bar-val">60</span></div>
+              <div class="proj-bar-row"><span class="proj-bar-label">Features</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:35%;background:#f472b6"></div></div><span class="proj-bar-val">35</span></div>
+              <div class="proj-bar-row"><span class="proj-bar-label">Usability</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:55%;background:#f472b6"></div></div><span class="proj-bar-val">55</span></div>
+            </div>
+          </div>
+          <div class="proj-mini">
+            <div class="proj-mini-head"><div class="proj-dot" style="background:#34d399"></div><div><div class="proj-mini-name">VeraCrypt</div><div class="proj-mini-sub">Disk encryptor</div></div></div>
+            <div class="proj-tags"><span class="proj-tag">C++</span><span class="proj-tag">AES-XTS</span><span class="proj-tag">Desktop</span></div>
+            <div class="proj-bars">
+              <div class="proj-bar-row"><span class="proj-bar-label">Security</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:97%;background:#34d399"></div></div><span class="proj-bar-val">97</span></div>
+              <div class="proj-bar-row"><span class="proj-bar-label">Features</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:68%;background:#34d399"></div></div><span class="proj-bar-val">68</span></div>
+              <div class="proj-bar-row"><span class="proj-bar-label">Usability</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:50%;background:#34d399"></div></div><span class="proj-bar-val">50</span></div>
+            </div>
+          </div>
+          <div class="proj-mini">
+            <div class="proj-mini-head"><div class="proj-dot" style="background:#fbbf24"></div><div><div class="proj-mini-name">age</div><div class="proj-mini-sub">Modern CLI tool</div></div></div>
+            <div class="proj-tags"><span class="proj-tag">Go</span><span class="proj-tag">ChaCha20</span><span class="proj-tag">CLI</span></div>
+            <div class="proj-bars">
+              <div class="proj-bar-row"><span class="proj-bar-label">Security</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:88%;background:#fbbf24"></div></div><span class="proj-bar-val">88</span></div>
+              <div class="proj-bar-row"><span class="proj-bar-label">Features</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:40%;background:#fbbf24"></div></div><span class="proj-bar-val">40</span></div>
+              <div class="proj-bar-row"><span class="proj-bar-label">Usability</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:65%;background:#fbbf24"></div></div><span class="proj-bar-val">65</span></div>
+            </div>
+          </div>
+          <div class="proj-mini">
+            <div class="proj-mini-head"><div class="proj-dot" style="background:#a78bfa"></div><div><div class="proj-mini-name">Cryptomator</div><div class="proj-mini-sub">Cloud encryptor</div></div></div>
+            <div class="proj-tags"><span class="proj-tag">Java</span><span class="proj-tag">AES-SIV</span><span class="proj-tag">Desktop+Mobile</span></div>
+            <div class="proj-bars">
+              <div class="proj-bar-row"><span class="proj-bar-label">Security</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:85%;background:#a78bfa"></div></div><span class="proj-bar-val">85</span></div>
+              <div class="proj-bar-row"><span class="proj-bar-label">Features</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:60%;background:#a78bfa"></div></div><span class="proj-bar-val">60</span></div>
+              <div class="proj-bar-row"><span class="proj-bar-label">Usability</span><div class="proj-bar-track"><div class="proj-bar-fill" style="width:88%;background:#a78bfa"></div></div><span class="proj-bar-val">88</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cmp-section-label">Multi-Dimension Radar & Dimension Scores</div>
+        <p style="color:var(--muted); font-size:14px; margin-bottom:15px; line-height:1.5;">This radar chart illustrates how SecureFS excels across all major dimensions compared to standard tools. While others focus heavily on basic security, SecureFS provides an unmatched balance of collaborative features (RBAC), auditing (Blockchain), and usability.</p>
+        <div class="cmp-grid-2">
+          <div class="cmp-card"><div class="cmp-chart-title">7-Axis Capability Radar</div><div class="cmp-chart-sub">All 5 projects across key dimensions</div><canvas id="cmpRadar" height="260"></canvas></div>
+          <div class="cmp-card"><div class="cmp-chart-title">SecureFS v2 Dimension Scores</div><div class="cmp-chart-sub">marks where SecureFS leads all others</div><div id="cmp-score-bars" style="margin-top:8px"></div></div>
+        </div>
+
+        <div class="cmp-section-label">Security Architecture & Feature Count</div>
+        <p style="color:var(--muted); font-size:14px; margin-bottom:15px; line-height:1.5;">By stacking multiple layers of defense (including Intrusion Detection, AAD identity binding, and Blockchain), SecureFS provides a significantly more resilient security architecture than traditional AES-only tools. It incorporates 16 of the 17 tracked enterprise features.</p>
+        <div class="cmp-grid-2">
+          <div class="cmp-card"><div class="cmp-chart-title">Security Score Composition</div><div class="cmp-chart-sub">Cipher + key derivation + AAD + tamper detect + IDS + blockchain</div><canvas id="cmpSecStack" height="200"></canvas></div>
+          <div class="cmp-card"><div class="cmp-chart-title">Feature Count (of 17 tracked)</div><div class="cmp-chart-sub">SecureFS v2 implements 16 - highest of all tools</div><canvas id="cmpFeatureBar" height="200"></canvas></div>
+        </div>
+
+        <div class="cmp-section-label">Complexity vs Value & Unique Capabilities</div>
+        <p style="color:var(--muted); font-size:14px; margin-bottom:15px; line-height:1.5;">The Bubble Chart shows how SecureFS delivers high value and feature completeness without compromising on usability. The Unique Capabilities chart highlights features that are entirely exclusive to SecureFS.</p>
+        <div class="cmp-grid-2">
+          <div class="cmp-card"><div class="cmp-chart-title">Features vs Complexity Bubble</div><div class="cmp-chart-sub">X = implementation complexity . Y = feature completeness . Size = usability</div><canvas id="cmpBubble" height="200"></canvas></div>
+          <div class="cmp-card"><div class="cmp-chart-title">Exclusive Capabilities</div><div class="cmp-chart-sub">Features in SecureFS absent from all 4 other tools</div><canvas id="cmpUnique" height="200"></canvas></div>
+        </div>
+
+        <div class="cmp-section-label">Full Feature Comparison Matrix</div>
+        <div class="cmp-insight"><strong>SecureFS v2 uniquely combines:</strong> role-based access control (6 roles), blockchain audit ledger, intrusion detection system, identity-bound encryption via AAD, file registry with hash tracking, and export capabilities - no other tool in this comparison offers all simultaneously.</div>
+        <div class="card" style="padding:0;overflow-x:auto;">
+          <table class="cmp-feat-table">
+            <thead><tr>
+              <th>Feature</th>
+              <th style="color:#38bdf8">SecureFS v2</th>
+              <th style="color:#f472b6">VaultMan</th>
+              <th style="color:#34d399">VeraCrypt</th>
+              <th style="color:#fbbf24">age</th>
+              <th style="color:#a78bfa">Cryptomator</th>
+            </tr></thead>
+            <tbody>
+              <tr><td>AES-256-GCM (AEAD)</td><td><span class="cft-check">Y</span></td><td><span class="cft-cross">N</span> AES-128</td><td><span class="cft-check">Y</span></td><td><span class="cft-cross">N</span> ChaCha20</td><td><span class="cft-part">~ AES-SIV</span></td></tr>
+              <tr><td>PBKDF2 Key Derivation</td><td><span class="cft-check">Y</span> 100K</td><td><span class="cft-check">Y</span> PBKDF2HMAC</td><td><span class="cft-check">Y</span> 500K</td><td><span class="cft-cross">N</span> scrypt</td><td><span class="cft-check">Y</span> scrypt</td></tr>
+              <tr><td>Identity-Bound Encryption (AAD)</td><td><span class="cft-check">Y</span> username|empId</td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>Role-Based Access Control</td><td><span class="cft-check">Y</span> 6 roles</td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>Blockchain Audit Ledger</td><td><span class="cft-check">Y</span> SHA-256 linked</td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>Intrusion Detection (IDS)</td><td><span class="cft-check">Y</span> Lock @5 fails</td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>Audit / Access Log</td><td><span class="cft-check">Y</span> Full trail</td><td><span class="cft-cross">N</span></td><td><span class="cft-part">~ Basic</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>File Registry + Hash Tracking</td><td><span class="cft-check">Y</span> SHA-256 index</td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>Export Audit Log (CSV)</td><td><span class="cft-check">Y</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>Multi-User Support</td><td><span class="cft-check">Y</span> User DB</td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-part">~ Paid teams</span></td></tr>
+              <tr><td>Browser-Only Deployment</td><td><span class="cft-check">Y</span> Pure HTML</td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>File Integrity Verify</td><td><span class="cft-check">Y</span> GCM tag</td><td><span class="cft-cross">N</span></td><td><span class="cft-check">Y</span></td><td><span class="cft-check">Y</span></td><td><span class="cft-check">Y</span></td></tr>
+              <tr><td>No External Deps (browser)</td><td><span class="cft-check">Y</span> Web Crypto API</td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>Account Lock / Unlock</td><td><span class="cft-check">Y</span> Admin action</td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>Session Key (never stored)</td><td><span class="cft-check">Y</span> In-memory only</td><td><span class="cft-cross">N</span></td><td><span class="cft-check">Y</span></td><td><span class="cft-check">Y</span></td><td><span class="cft-check">Y</span></td></tr>
+              <tr><td>Password Strength Meter</td><td><span class="cft-check">Y</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td><td><span class="cft-cross">N</span></td></tr>
+              <tr><td>Open Source / Auditable</td><td><span class="cft-check">Y</span></td><td><span class="cft-check">Y</span></td><td><span class="cft-check">Y</span></td><td><span class="cft-check">Y</span></td><td><span class="cft-check">Y</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cmp-section-label">What Makes SecureFS v2 Unique</div>
+        <div class="cmp-unique-item"><div class="cmp-unique-dot" style="background:#fb923c"></div><span class="cmp-unique-label"><strong>Blockchain audit ledger</strong> - every action produces a cryptographically linked block. SHA-256 chain integrity is verifiable. Tampering is mathematically detectable.</span><span class="cmp-unique-badge">v2 New</span></div>
+        <div class="cmp-unique-item"><div class="cmp-unique-dot" style="background:#38bdf8"></div><span class="cmp-unique-label">Identity-bound encryption via AAD - ciphertext is cryptographically tied to username + employeeId. Decryption fails for any other user.</span><span class="cmp-unique-badge">Exclusive</span></div>
+        <div class="cmp-unique-item"><div class="cmp-unique-dot" style="background:#60a5fa"></div><span class="cmp-unique-label">Full RBAC with 6 roles (DEVELOPER, ADMIN, MANAGER, USER, AUDITOR, READ_ONLY) and per-operation permission checks.</span><span class="cmp-unique-badge">Exclusive</span></div>
+        <div class="cmp-unique-item"><div class="cmp-unique-dot" style="background:#818cf8"></div><span class="cmp-unique-label">Sliding-window Intrusion Detection System - accounts auto-lock after 5 failed logins in 10 minutes.</span><span class="cmp-unique-badge">Exclusive</span></div>
+        <div class="cmp-unique-item"><div class="cmp-unique-dot" style="background:#a78bfa"></div><span class="cmp-unique-label">File registry with SHA-256 content hashing - track every encrypted file with a blockchain-anchored record.</span><span class="cmp-unique-badge">Exclusive</span></div>
+        <div class="cmp-unique-item"><div class="cmp-unique-dot" style="background:#c084fc"></div><span class="cmp-unique-label">Browser implementation uses only the native Web Crypto API - zero external libraries, zero dependency attack surface.</span><span class="cmp-unique-badge">Exclusive</span></div>
+      </div>
+
+
+</div>
+
+<div id="login-screen">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div style="position:absolute;top:20px;right:20px;">
+        <button onclick="toggleServerSettings()" class="tool-btn" title="Server Settings" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--dim);padding:4px 8px;border-radius:4px;cursor:pointer">⚙️</button>
+      </div>
+      <div id="server-settings" style="display:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:15px;margin-bottom:20px;animation:slideDown 0.3s ease">
+        <label style="display:block;font-size:11px;color:var(--dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Remote API URL</label>
+        <div style="display:flex;gap:10px">
+          <input type="text" id="custom-api-url" placeholder="http://localhost:8443" style="flex:1;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.1);color:white;padding:8px 12px;border-radius:6px;font-size:13px">
+          <button onclick="saveServerSettings()" class="op-btn" style="padding:0 15px;font-size:12px">Apply</button>
+        </div>
+        <p style="font-size:10px;color:var(--muted);margin-top:8px">Leave empty to use local server. Use this to connect to shared enterprise instances.</p>
+      </div>
+      <h2>Authentication</h2>
+      <p class="login-sub">Role-based access control with blockchain audit trail. Your session key is derived from your password and never stored.</p>
+      <div class="blockchain-badge">
+        <span>⛓</span>
+        <span>Every action is recorded on an <strong>immutable blockchain ledger</strong> — cryptographically linked blocks that cannot be altered.</span>
+      </div>
+      <div class="ids-banner">
+        <span>⚠</span>
+        <span>Intrusion detection active. Accounts lock after <strong>5 failed attempts</strong> within 10 minutes.</span>
+      </div>
+      <div class="field">
+        <label>Username</label>
+        <input type="text" id="login-user" placeholder="Enter username…" autocomplete="username" onkeydown="if(event.key==='Enter')login()">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="login-pass" placeholder="Enter password…" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn-login" style="flex:1" onclick="login()">Sign In →</button>
+        <button class="op-btn btn-neutral" style="flex:1" onclick="loginWebAuthn()">👆 Biometrics</button>
+      </div>
+      <div class="setup-hint">
+        Default admin: <code style="color:var(--accent)">admin</code> &nbsp;|&nbsp;
+        Set password on first login &nbsp;|&nbsp;
+        Role: <span class="role-tag role-DEVELOPER">DEVELOPER</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main-screen">
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-section-label">File Operations</div>
+      <div class="nav-item active" data-panel="encrypt" onclick="nav(this)"><span class="nav-icon">🔒</span>Encrypt</div>
+      <div class="nav-item" data-panel="decrypt" onclick="nav(this)"><span class="nav-icon">🔓</span>Decrypt</div>
+      <div class="nav-item" data-panel="verify" onclick="nav(this)"><span class="nav-icon">✅</span>Verify Integrity</div>
+      <div class="nav-item" data-panel="registry" onclick="nav(this)"><span class="nav-icon">🗂</span>File History <span class="nav-badge" id="reg-badge">0</span></div>
+
+      <div class="sidebar-section-label">Team</div>
+      <div class="nav-item" data-panel="projects" onclick="nav(this)"><span class="nav-icon">📁</span>Projects <span class="nav-badge" id="proj-badge">0</span></div>
+
+      <div class="sidebar-section-label" id="sec-mgmt-label" style="display:none">Management</div>
+      <div class="nav-item" data-panel="logs" id="nav-logs" style="display:none" onclick="nav(this)"><span class="nav-icon">📋</span>Access Logs</div>
+      <div class="nav-item" data-panel="stats" id="nav-stats" style="display:none" onclick="nav(this)"><span class="nav-icon">📊</span>System Stats</div>
+      <div class="nav-item" data-panel="users" id="nav-users" style="display:none" onclick="nav(this)"><span class="nav-icon">👥</span>User Management</div>
+
+      <div class="sidebar-section-label">Security</div>
+      <div class="nav-item" data-panel="blockchain" onclick="nav(this)"><span class="nav-icon">⛓</span>Blockchain Ledger <span class="nav-badge orange" id="chain-badge">0</span></div>
+
+      <div class="sidebar-spacer"></div>
+      <div class="nav-item" data-panel="settings" onclick="nav(this)"><span class="nav-icon">⚙</span>Settings</div>
+      <div class="nav-item danger" onclick="logout()"><span class="nav-icon">↩</span>Sign Out</div>
+    </aside>
+
+    <main class="content">
+
+      <!-- ENCRYPT -->
+      <div class="panel active" id="panel-encrypt">
+        <div class="panel-header">
+          <div class="panel-header-text">
+            <div class="panel-title">Encrypt File</div>
+            <div class="panel-desc">AES-256-GCM with PBKDF2 key derivation. Identity cryptographically bound via AAD. Operation recorded to blockchain.</div>
+          </div>
+        </div>
+        <div class="info-box"><span class="info-box-icon">ℹ</span><span>AAD binds <code style="color:var(--accent)">username|employeeId</code> to the ciphertext — only you can decrypt. The file hash is anchored to the blockchain ledger on encryption.</span></div>
+        <div class="card">
+          <div class="card-label">Input File</div>
+          <div class="file-drop" id="enc-drop">
+            <input type="file" id="enc-file" onchange="fileChosen('enc')" multiple>
+            <div class="drop-icon">📂</div>
+            <div class="drop-text">Drop a file/folder or <strong>click to browse</strong></div>
+            <div class="drop-name" id="enc-fname"></div>
+            <div class="drop-meta" id="enc-fmeta"></div>
+          </div>
+          <div class="two-col" style="margin-top:16px; margin-bottom:10px">
+            <div class="field" style="margin-bottom:0">
+              <label>Expires At <span style="color:var(--dim)">(optional)</span></label>
+              <input type="datetime-local" id="enc-expires">
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>Max Views <span style="color:var(--dim)">(optional)</span></label>
+              <input type="number" id="enc-max-views" min="1" placeholder="e.g. 5">
+            </div>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>Save to Project <span style="color:var(--dim)">(optional — requires Server mode)</span></label>
+            <select id="enc-project-select">
+              <option value="">— Personal file, no project —</option>
+            </select>
+          </div>
+          <div class="actions">
+            <button class="op-btn btn-encrypt" onclick="doEncrypt(event)">🔒 Encrypt &amp; Save</button>
+            <button class="op-btn btn-neutral" onclick="clearFile('enc')">✕ Clear</button>
+          </div>
+          <div class="result-box" id="enc-result"></div>
+        </div>
+      </div>
+
+      <!-- DECRYPT -->
+      <div class="panel" id="panel-decrypt">
+        <div class="panel-header">
+          <div class="panel-header-text">
+            <div class="panel-title">Decrypt File</div>
+            <div class="panel-desc">Authenticate and decrypt a .enc file. Fails if identity or session key doesn't match. Operation logged to blockchain.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">Encrypted File (.enc)</div>
+          <div class="file-drop" id="dec-drop">
+            <input type="file" id="dec-file" accept=".enc" onchange="fileChosen('dec')">
+            <div class="drop-icon">🔐</div>
+            <div class="drop-text">Drop a <strong>.enc file</strong> or click to browse</div>
+            <div class="drop-name" id="dec-fname"></div>
+            <div class="drop-meta" id="dec-fmeta"></div>
+          </div>
+          <div class="actions">
+            <button class="op-btn btn-decrypt" onclick="doDecrypt(event)">🔓 Decrypt File</button>
+            <button class="op-btn btn-neutral" onclick="clearFile('dec')">✕ Clear</button>
+          </div>
+          <div class="result-box" id="dec-result"></div>
+        </div>
+      </div>
+
+      <!-- VERIFY -->
+      <div class="panel" id="panel-verify">
+        <div class="panel-header">
+          <div class="panel-header-text">
+            <div class="panel-title">Verify Integrity</div>
+            <div class="panel-desc">Cryptographically verify a file hasn't been tampered with, without writing output. Verification logged to blockchain.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">Encrypted File (.enc)</div>
+          <div class="file-drop" id="ver-drop">
+            <input type="file" id="ver-file" accept=".enc" onchange="fileChosen('ver')">
+            <div class="drop-icon">🔍</div>
+            <div class="drop-text">Drop a <strong>.enc file</strong> or click to browse</div>
+            <div class="drop-name" id="ver-fname"></div>
+            <div class="drop-meta" id="ver-fmeta"></div>
+          </div>
+          <div class="actions">
+            <button class="op-btn btn-verify" onclick="doVerify(event)">✅ Verify Integrity</button>
+            <button class="op-btn btn-neutral" onclick="clearFile('ver')">✕ Clear</button>
+          </div>
+          <div class="result-box" id="ver-result"></div>
+        </div>
+      </div>
+
+      <!-- FILE REGISTRY -->
+      <div class="panel" id="panel-registry">
+        <div class="panel-header">
+          <div class="panel-header-text">
+            <div class="panel-title">File Registry</div>
+            <div class="panel-desc">Track all files encrypted during this session with their blockchain-anchored hashes.</div>
+          </div>
+          <div class="panel-actions">
+            <button class="op-btn btn-neutral" onclick="clearRegistry()">🗑 Clear Registry</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden" id="registry-card">
+          <div id="registry-content"></div>
+        </div>
+      </div>
+
+      <!-- LOGS -->
+      <div class="panel" id="panel-logs">
+        <div class="panel-header">
+          <div class="panel-header-text">
+            <div class="panel-title">Access Logs</div>
+            <div class="panel-desc">Full audit trail — all actions this session. Every entry is also anchored to the blockchain.</div>
+          </div>
+          <div class="panel-actions">
+            <button class="op-btn btn-neutral" onclick="exportLogs()">⬇ Export CSV</button>
+            <button class="op-btn btn-neutral" onclick="clearLogs()">🗑 Clear</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden"><div id="logs-content"></div></div>
+      </div>
+
+      <!-- STATS -->
+      <div class="panel" id="panel-stats">
+        <div class="panel-header">
+          <div class="panel-header-text">
+            <div class="panel-title">System Statistics</div>
+            <div class="panel-desc">Overview of registered users, account states, and session activity.</div>
+          </div>
+        </div>
+        <div class="stats-grid" id="stats-grid"></div>
+        <div class="card" style="padding:0;overflow:hidden"><div id="stats-user-table"></div></div>
+      </div>
+
+      <!-- USERS -->
+      <div class="panel" id="panel-users">
+        <div class="panel-header">
+          <div class="panel-header-text">
+            <div class="panel-title">User Management</div>
+            <div class="panel-desc">Add, modify roles, lock, unlock, or delete users. All actions recorded to blockchain.</div>
+          </div>
+          <div class="panel-actions">
+            <button class="op-btn btn-action" id="btn-add-user" onclick="openAddUser()">＋ Add User</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden"><div id="users-table"></div></div>
+      </div>
+
+      <!-- BLOCKCHAIN LEDGER -->
+      <div class="panel" id="panel-blockchain">
+        <div class="panel-header">
+          <div class="panel-header-text">
+            <div class="panel-title">Blockchain Audit Ledger</div>
+            <div class="panel-desc">Immutable chain of cryptographically linked blocks. Each block contains action data + hash of the previous block. Tampering is detectable.</div>
+          </div>
+          <div class="panel-actions">
+            <button class="op-btn btn-orange" onclick="verifyChain()">🔗 Verify Chain</button>
+            <button class="op-btn btn-neutral" onclick="exportChain()">⬇ Export JSON</button>
+          </div>
+        </div>
+        <div class="warn-box"><span class="warn-box-icon">⛓</span><span>This is a <strong>simulated blockchain</strong> using SHA-256 hashing and linked blocks — the same core concept as production blockchain audit systems. Each block's hash includes the previous block's hash, making retroactive tampering detectable.</span></div>
+        <div class="chain-summary" id="chain-summary"></div>
+        <canvas id="chain-canvas" height="180" width="1000" style="width:100%; border-radius:16px; background:rgba(24,24,27,0.4); border:1px solid rgba(255,255,255,0.08); margin-bottom:24px; display:none;"></canvas>
+        <div class="chain-explorer" id="chain-explorer">
+          <div class="empty"><div class="empty-icon">⛓</div><div class="empty-txt">No blocks yet. Perform any action to create the first block.</div></div>
+        </div>
+      </div>
+
+      <!-- PROJECTS -->
+      <div class="panel" id="panel-projects">
+        <div class="panel-header">
+          <div class="panel-header-text">
+            <div class="panel-title">Projects</div>
+            <div class="panel-desc">Group files by project and share access with teammates. Members can upload, download, and decrypt shared files.</div>
+          </div>
+          <div class="panel-actions">
+            <button class="op-btn btn-action" onclick="openCreateProject()">＋ New Project</button>
+            <button class="op-btn btn-neutral" onclick="loadProjects()">↺ Refresh</button>
+          </div>
+        </div>
+        <div id="projects-list"></div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="panel" id="panel-settings">
+        <div class="panel-header">
+          <div class="panel-header-text">
+            <div class="panel-title">Settings</div>
+            <div class="panel-desc">Account settings and system configuration.</div>
+          </div>
+        </div>
+        <!-- API CONFIGURATION CARD -->
+        <div class="card" id="api-config-card">
+          <div class="card-label">Backend API Connection</div>
+          <div class="info-box" style="margin-bottom:14px"><span class="info-box-icon">ℹ</span><span>SecureFS is currently set to <strong>Server mode</strong> by default. Operations route through your Python backend. Ensure your backend is running.</span></div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
+            <div class="field" style="flex:1;min-width:200px;margin-bottom:0">
+              <label>Backend URL</label>
+              <input type="text" id="api-url-input" placeholder="http://localhost:8443" value="http://localhost:8443">
+            </div>
+            <button class="op-btn btn-verify" onclick="pingApi()" style="flex-shrink:0">⚡ Ping</button>
+            <button class="op-btn btn-action" onclick="saveApiUrl()" style="flex-shrink:0">Save</button>
+          </div>
+          <div id="api-ping-result" style="font-size:12px;color:var(--muted);line-height:1.8;display:none"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Biometric Authentication</div>
+          <p style="font-size:13px; color:var(--muted); margin-bottom:14px; line-height:1.5;">Register your fingerprint, FaceID, or hardware key for passwordless authentication. This relies on the WebAuthn standard.</p>
+          <div class="actions">
+            <button class="op-btn btn-action" onclick="registerWebAuthn()">👆 Register Biometric</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Change Password</div>
+          <div class="two-col">
+            <div class="field"><label>Current Password</label><input type="password" id="set-old" placeholder="Current password"></div>
+            <div></div>
+            <div class="field">
+              <label>New Password</label>
+              <input type="password" id="set-new" placeholder="New password" oninput="checkPwStrength(this.value,'set-strength','set-strength-label')">
+              <div class="pw-strength"><div class="pw-strength-bar" id="set-strength"></div></div>
+              <div class="pw-strength-label" id="set-strength-label"></div>
+            </div>
+            <div class="field"><label>Confirm New Password</label><input type="password" id="set-conf" placeholder="Confirm new password"></div>
+          </div>
+          <div class="actions">
+            <button class="op-btn btn-action" onclick="changePassword()">🔑 Change Password</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">Data Management</div>
+          <div class="actions">
+            <button class="op-btn btn-danger" onclick="resetAllData()">⚠ Reset All Data</button>
+            <button class="op-btn btn-neutral" onclick="exportChain()">⬇ Export Blockchain JSON</button>
+            <button class="op-btn btn-neutral" onclick="exportLogs()">⬇ Export Logs CSV</button>
+            <button class="op-btn btn-action" onclick="toggleTerminal()">⌨ Open Terminal Mode</button>
+            <button class="op-btn btn-neutral" id="compliance-btn" onclick="generateComplianceReport()" style="display:none">📊 Compliance Report</button>
+          </div>
+          <div style="margin-top:14px;font-size:11px;color:var(--muted);line-height:1.7">
+            Reset All Data clears localStorage (user accounts, blockchain, fail tracker). Use with caution — this cannot be undone.
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">System Information</div>
+          <div style="font-size:12px;line-height:2;color:var(--muted)">
+            <div class="r-row"><span class="r-k">Version</span><span class="r-v">SecureFS v2.0</span></div>
+            <div class="r-row"><span class="r-k">Cipher</span><span class="r-v">AES-256-GCM (AEAD)</span></div>
+            <div class="r-row"><span class="r-k">Key Derivation</span><span class="r-v">PBKDF2-SHA256 · 100,000 iterations</span></div>
+            <div class="r-row"><span class="r-k">Salt Length</span><span class="r-v">16 bytes (random per file)</span></div>
+            <div class="r-row"><span class="r-k">IV Length</span><span class="r-v">12 bytes (random per file)</span></div>
+            <div class="r-row"><span class="r-k">GCM Tag</span><span class="r-v">128 bits</span></div>
+            <div class="r-row"><span class="r-k">Blockchain Hash</span><span class="r-v">SHA-256 (Web Crypto)</span></div>
+            <div class="r-row"><span class="r-k">Crypto Engine</span><span class="r-v">Web Crypto API (native browser)</span></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- TERMINAL OVERLAY -->
+<div id="terminal-overlay">
+  <div id="terminal-header">
+    <div style="font-weight:bold; color:#fff;">SecureFS Terminal Mode</div>
+    <button class="op-btn btn-neutral" style="padding:4px 8px; font-size:11px;" onclick="toggleTerminal()">Close (Esc)</button>
+  </div>
+  <div id="terminal-output">
+    <div>Welcome to SecureFS Power Shell v2.0</div>
+    <div>Type 'help' for a list of available commands.</div><br>
+  </div>
+  <div id="terminal-input-row">
+    <div id="terminal-prompt">root@securefs:~#</div>
+    <input type="text" id="terminal-input" autocomplete="off" spellcheck="false" placeholder="Enter command...">
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal" id="modal-inner">
+    <h3 id="modal-title">Dialog</h3>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="op-btn btn-neutral" onclick="closeModal()">Cancel</button>
+      <button class="op-btn" id="modal-confirm" onclick="modalConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+// CONSTANTS & STATE
+const ROLE_PERMISSIONS = {
+  DEVELOPER:  ['encrypt','decrypt','verify','view_logs','add_user','delete_user','modify_role','lock_account','unlock_account','view_stats'],
+  ADMIN:      ['encrypt','decrypt','verify','view_logs','add_user','lock_account','unlock_account','view_stats'],
+  MANAGER:    ['encrypt','decrypt','verify'],
+  USER:       ['encrypt','decrypt','verify'],
+  AUDITOR:    ['view_logs','verify'],
+  READ_ONLY:  ['verify']
+};
+const SALT_LEN=16, IV_LEN=12;
+const FILE_ICONS = {pdf:'📄',doc:'📝',docx:'📝',txt:'📄',jpg:'🖼',jpeg:'🖼',png:'🖼',gif:'🖼',mp4:'🎬',mp3:'🎵',zip:'📦',rar:'📦',exe:'⚙',js:'💻',py:'🐍',enc:'🔐'};
+
+let currentUser = null;
+let isDesktop = false;
+let sessionLogs = [];
+let fileData = {enc:null,dec:null,ver:null};
+let fileName = {enc:'',dec:'',ver:''};
+let fileSize = {enc:0,dec:0,ver:0};
+let modalCallback = null;
+let fileRegistry = [];
+let chartsInitialized = false;
+
+// PROJECT STATE
+let projectsCache = [];         // all projects user is a member of
+let currentProjectId = null;    // project currently being viewed
+// In-memory blob store: id → ArrayBuffer (not persisted, session only)
+const encryptedBlobStore = new Map();
+
+// INDEXEDDB — persistent encrypted file storage
+let idb = null;
+const IDB_NAME = 'securefs_v2';
+const IDB_STORE = 'encrypted_files';
+
+function openIDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE, {keyPath: 'id'});
+      }
+    };
+    req.onsuccess = e => { idb = e.target.result; resolve(idb); };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbSave(entry, buffer) {
+  if (!idb) return;
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put({id: entry.id, encName: entry.encName, buffer});
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function idbGet(id) {
+  if (!idb) return null;
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function idbDelete(id) {
+  if (!idb) return;
+  return new Promise((resolve) => {
+    const tx = idb.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(id);
+    tx.oncomplete = resolve;
+    tx.onerror = resolve;
+  });
+}
+
+// Hydrate in-memory store from IDB on load (so current-session blobs are fast)
+async function hydrateFromIDB() {
+  if (!idb) return;
+  return new Promise(resolve => {
+    const tx = idb.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).getAll();
+    req.onsuccess = () => {
+      for (const rec of (req.result || [])) {
+        if (!encryptedBlobStore.has(rec.id)) encryptedBlobStore.set(rec.id, rec.buffer);
+      }
+      resolve();
+    };
+    req.onerror = resolve;
+  });
+}
+
+// Init IDB immediately
+openIDB().then(hydrateFromIDB).catch(()=>{});
+
+// BLOCKCHAIN
+// ================================================================
+// ROUTING
+// ================================================================
+function goToLogin() {
+  document.getElementById('landing-screen').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+}
+
+function showLanding() {
+  setTimeout(initCompareCharts, 80);
+  document.getElementById('landing-screen').style.display='flex';
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('main-screen').style.display='none';
+  document.getElementById('header-user').style.display='none';
+  document.getElementById('header-chain').style.display='flex';
+}
+let blockchain = [];
+
+async function sha256(data) {
+  const buf = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function mineBlock(data) {
+  const prev = blockchain.length > 0 ? blockchain[blockchain.length-1].hash : '0000000000000000000000000000000000000000000000000000000000000000';
+  const index = blockchain.length;
+  const ts = new Date().toISOString();
+  const payload = JSON.stringify({index, ts, prev, data});
+  const hash = await sha256(payload);
+  const block = {index, timestamp:ts, previousHash:prev, data, hash};
+  blockchain.push(block);
+  updateChainUI();
+  return block;
+}
+
+async function verifyChainIntegrity() {
+  if (blockchain.length === 0) return {valid:true, blocks:0};
+  for (let i = 0; i < blockchain.length; i++) {
+    const b = blockchain[i];
+    const expectedPrev = i === 0 ? '0'.repeat(64) : blockchain[i-1].hash;
+    if (b.previousHash !== expectedPrev) return {valid:false, failAt:i, reason:'previous hash mismatch'};
+    const payload = JSON.stringify({index:b.index, ts:b.timestamp, prev:b.previousHash, data:b.data});
+    const recalc = await sha256(payload);
+    if (recalc !== b.hash) return {valid:false, failAt:i, reason:'hash mismatch'};
+  }
+  return {valid:true, blocks:blockchain.length};
+}
+
+function updateChainUI() {
+  const badge = document.getElementById('chain-badge');
+  if (badge) badge.textContent = blockchain.length;
+  const cnt = document.getElementById('chain-block-count');
+  if (cnt) cnt.textContent = `· ${blockchain.length} block${blockchain.length!==1?'s':''}`;
+}
+
+async function verifyChain() {
+  if (blockchain.length === 0) { toast('No blocks in chain yet.','info'); return; }
+  const result = await verifyChainIntegrity();
+  if (result.valid) {
+    toast(`Chain valid ✓ — ${result.blocks} blocks verified.`,'success');
+  } else {
+    toast(`Chain INVALID at block #${result.failAt}: ${result.reason}`,'error');
+  }
+  renderBlockchain();
+}
+
+function exportChain() {
+  const blob = new Blob([JSON.stringify(blockchain, null, 2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='securefs_blockchain.json'; a.click();
+  toast('Blockchain exported.','success');
+}
+
+// STATE
+let userDB = {};
+
+(function init(){
+  showLanding();
+  try {
+    const storedChain = localStorage.getItem('sfs_chain');
+    if (storedChain) blockchain = JSON.parse(storedChain);
+    const storedReg = localStorage.getItem('sfs_registry');
+    if (storedReg) fileRegistry = JSON.parse(storedReg);
+  } catch(e) {
+    blockchain = [];
+    fileRegistry = [];
+  }
+})();
+
+function saveChain(){ localStorage.setItem('sfs_chain',JSON.stringify(blockchain)); }
+function saveRegistry(){ localStorage.setItem('sfs_registry',JSON.stringify(fileRegistry)); }
+
+// CRYPTO
+async function hashPassword(password, salt) {
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},base,256);
+  return new Uint8Array(bits);
+}
+async function deriveSessionKey(passwordHash) {
+  const enc = new TextEncoder();
+  const combined = new Uint8Array([...passwordHash,...enc.encode('SESSION')]);
+  const digest = await crypto.subtle.digest('SHA-256',combined);
+  return new Uint8Array(digest);
+}
+async function deriveFileKey(sessionKey, salt) {
+  const base = await crypto.subtle.importKey('raw',sessionKey,'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+function aad(user) { return new TextEncoder().encode(`${user.username}|${user.employeeId}`); }
+function hexArr(arr){ return Array.from(arr).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+function arrHex(hex){ const a=new Uint8Array(hex.length/2); for(let i=0;i<a.length;i++) a[i]=parseInt(hex.substr(i*2,2),16); return a; }
+function fmtBytes(b){ if(b<1024) return b+'B'; if(b<1048576) return (b/1024).toFixed(1)+'KB'; return (b/1048576).toFixed(2)+'MB'; }
+function fileIcon(name){ const ext=(name.split('.').pop()||'').toLowerCase(); return FILE_ICONS[ext]||'📎'; }
+
+
+// ── Filename / MIME helpers ───────────────────────────────────────────────
+function getOriginalName(encFileName) {
+  // Strip .enc suffix to recover original filename with correct extension
+  if (!encFileName) return 'decrypted_file';
+  return encFileName.replace(/\.enc$/i, '') || 'decrypted_file';
+}
+
+function guessMimeType(filename) {
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  const map = {
+    png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif',
+    webp:'image/webp', bmp:'image/bmp', svg:'image/svg+xml', ico:'image/x-icon',
+    mp4:'video/mp4', mkv:'video/x-matroska', avi:'video/x-msvideo',
+    mov:'video/quicktime', webm:'video/webm', mp3:'audio/mpeg',
+    wav:'audio/wav', ogg:'audio/ogg', flac:'audio/flac',
+    pdf:'application/pdf',
+    doc:'application/msword',
+    docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls:'application/vnd.ms-excel',
+    xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt:'application/vnd.ms-powerpoint',
+    pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    zip:'application/zip', rar:'application/x-rar-compressed',
+    '7z':'application/x-7z-compressed', tar:'application/x-tar',
+    gz:'application/gzip',
+    txt:'text/plain', csv:'text/csv', html:'text/html', css:'text/css',
+    js:'text/javascript', json:'application/json', xml:'application/xml',
+    py:'text/x-python', java:'text/x-java-source', c:'text/x-c',
+    cpp:'text/x-c++src', ts:'text/typescript', md:'text/markdown',
+    exe:'application/x-msdownload', apk:'application/vnd.android.package-archive',
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
+function makeBlobUrl(buf, filename) {
+  return URL.createObjectURL(new Blob([buf], {type: guessMimeType(filename)}));
+}
+
+function triggerDownload(url, filename) {
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// IDS
+// IDS - Now handled by backend
+function isLocked(u){ return userDB[u]?.locked === true; }
+
+// PASSWORD STRENGTH
+function checkPwStrength(pw, barId, labelId) {
+  const bar = document.getElementById(barId);
+  const label = document.getElementById(labelId);
+  if (!pw) { bar.style.width='0'; label.textContent=''; return 0; }
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const levels = [
+    {w:'10%',c:'#f87171',t:'Very Weak'},
+    {w:'25%',c:'#fb923c',t:'Weak'},
+    {w:'50%',c:'#fbbf24',t:'Fair'},
+    {w:'75%',c:'#60a5fa',t:'Strong'},
+    {w:'100%',c:'#34d399',t:'Very Strong'},
+  ];
+  const l = levels[Math.min(score,4)];
+  bar.style.width=l.w; bar.style.background=l.c;
+  label.textContent=l.t; label.style.color=l.c;
+  return score;
+}
+
+// AUTH
+function toggleServerSettings() {
+  const el = document.getElementById('server-settings');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('custom-api-url').value = localStorage.getItem('sfs_custom_api') || '';
+}
+function saveServerSettings() {
+  const val = document.getElementById('custom-api-url').value.trim();
+  if (val) {
+    localStorage.setItem('sfs_custom_api', val);
+    apiUrl = val;
+  } else {
+    localStorage.removeItem('sfs_custom_api');
+    apiUrl = 'http://localhost:8443';
+  }
+  toast('Server configuration updated', 'success');
+  document.getElementById('server-settings').style.display = 'none';
+  if (localStorage.getItem('sfs_custom_api')) {
+    apiUrl = localStorage.getItem('sfs_custom_api');
+  }
+  checkBackend();
+}
+
+async function login() {
+  const uname = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if (!uname||!pass) { toast('Enter username and password.','error'); return; }
+
+  // 1. Fetch salt from backend
+  let saltB;
+  try {
+    const resp = await fetch(`${apiUrl}/users/${uname}/salt`);
+    if (resp.status === 404 && uname === 'admin') {
+      // First time setup for admin
+      saltB = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+      const h = await hashPassword(pass, saltB);
+      const setupResp = await fetch(`${apiUrl}/users`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({username: 'admin', employeeId: 'DEV001', role: 'DEVELOPER', salt: hexArr(saltB), password_hash: hexArr(h)})
+      });
+      if (!setupResp.ok) throw new Error('Setup failed on server');
+      const sk = await deriveSessionKey(h);
+      currentUser = {username: uname, employeeId: 'DEV001', role: 'DEVELOPER', sessionKey: sk};
+      await logAndChain('LOGIN_SETUP', '-', 'OK');
+      toast('Admin password created and signed in!', 'success');
+      showMain();
+      return;
+    } else if (!resp.ok) {
+      toast('Invalid username or password.', 'error');
+      return;
+    }
+    const data = await resp.json();
+    saltB = arrHex(data.salt);
+  } catch(e) {
+    toast('Error contacting server. Make sure Backend is online.', 'error');
+    return;
+  }
+
+  // 2. Hash password locally
+  const h = await hashPassword(pass, saltB);
+
+  // 3. Send hash to backend for verification
+  try {
+    const resp = await fetch(`${apiUrl}/login`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: uname, password_hash: hexArr(h)})
+    });
+    if (!resp.ok) {
+        const err = await resp.json().catch(()=>({detail: 'Login failed'}));
+        const entry = {time:new Date().toISOString(), user:uname, role:'?', action:'LOGIN_FAIL', file:'-', status:'FAIL'};
+        sessionLogs.push(entry);
+        await mineBlock({action:'LOGIN_FAIL', user:uname, role:'?', file:'-', status:'FAIL', ts:entry.time});
+        saveChain();
+        toast(err.detail, 'error');
+        return;
+    }
+    const data = await resp.json();
+    // 4. Derive session key locally
+    const sk = await deriveSessionKey(h);
+    currentUser = {username: uname, employeeId: data.employeeId, role: data.role, sessionKey: sk};
+    if (hasPerm('view_logs')) document.getElementById('compliance-btn').style.display = 'block';
+    await logAndChain('LOGIN_SUCCESS', '-', 'OK');
+    showMain();
+  } catch(e) {
+    toast('Error connecting to server', 'error');
+  }
+}
+
+async function logAndChain(action, file='-', status='OK') {
+  const entry = {time:new Date().toISOString(),user:currentUser.username,role:currentUser.role,action,file,status};
+  sessionLogs.push(entry);
+  await mineBlock({action,user:currentUser.username,role:currentUser.role,file,status,ts:entry.time});
+  saveChain();
+}
+
+function logout() {
+  if (currentUser) { sessionLogs.push({time:new Date().toISOString(),user:currentUser.username,role:currentUser.role,action:'LOGOUT',file:'-',status:'OK'}); mineBlock({action:'LOGOUT',user:currentUser.username,ts:new Date().toISOString()}).then(saveChain); }
+  currentUser=null;
+  showLanding();
+  document.getElementById('login-user').value='';
+  document.getElementById('login-pass').value='';
+  toast('Signed out.','info');
+}function hasPerm(p){ return currentUser&&(ROLE_PERMISSIONS[currentUser.role]||[]).includes(p); }
+
+// SHOW MAIN
+function showMain() {
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('main-screen').style.display='flex';
+  document.getElementById('header-chain').style.display='flex';
+  const r=currentUser.role;
+  document.getElementById('header-user').style.display='flex';
+  document.getElementById('header-user').innerHTML=`<div class="user-chip"><div class="avatar av-${r}">${currentUser.username[0].toUpperCase()}</div><span class="chip-name">${currentUser.username}</span><span class="role-tag role-${r}">${r}</span></div>`;
+  const show=(id,perm)=>{ const el=document.getElementById(id); if(el) el.style.display=hasPerm(perm)?'flex':'none'; };
+  show('nav-logs','view_logs'); show('nav-stats','view_stats'); show('nav-users','add_user');
+  const mgmt=hasPerm('view_logs')||hasPerm('view_stats')||hasPerm('add_user');
+  document.getElementById('sec-mgmt-label').style.display=mgmt?'block':'none';
+  document.querySelectorAll('[data-panel="encrypt"],[data-panel="decrypt"]').forEach(el=>{
+    if(el.tagName==='DIV'){ el.style.opacity=hasPerm('encrypt')?'1':'0.35'; el.style.pointerEvents=hasPerm('encrypt')?'auto':'none'; }
+  });
+  updateChainUI();
+  nav(document.querySelector('.nav-item.active[data-panel]'));
+}
+
+// NAVIGATION
+function nav(el) {
+  if (!el) return;
+  const panel = el.dataset.panel;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-'+panel).classList.add('active');
+  if (panel==='logs') renderLogs();
+  if (panel==='stats') renderStats();
+  if (panel==='users') renderUsers();
+  if (panel==='blockchain') renderBlockchain();
+  if (panel==='registry') renderRegistry();
+  if (panel==='projects') { renderProjects(); if(apiOnline&&!projectsCache.length) loadProjects(); }
+  if (panel==='compare') setTimeout(initCompareCharts,80);
+}
+
+// FILE INPUT
+async function fileChosen(prefix) {
+  const input=document.getElementById(prefix+'-file');
+  const files=input.files; 
+  if(!files || files.length===0) return;
+  
+  if (prefix === 'enc' && files.length > 1) {
+    document.getElementById(prefix+'-fname').innerHTML = `<span class="spinner"></span> Zipping folder...`;
+    try {
+      const zipData = {};
+      let totalSize = 0;
+      for(let i=0; i<files.length; i++) {
+          const file = files[i];
+          const path = file.webkitRelativePath || file.name;
+          zipData[path] = new Uint8Array(await file.arrayBuffer());
+          totalSize += file.size;
+      }
+      const zipped = fflate.zipSync(zipData);
+      fileData[prefix] = zipped.buffer;
+      fileName[prefix] = (files[0].webkitRelativePath ? files[0].webkitRelativePath.split('/')[0] : 'archive') + '.zip';
+      fileSize[prefix] = zipped.byteLength;
+      document.getElementById(prefix+'-fname').textContent = fileName[prefix] + ` (${files.length} files)`;
+      document.getElementById(prefix+'-fmeta').textContent = `${fmtBytes(zipped.byteLength)} — zipped folder`;
+    } catch(e) {
+      toast('Failed to zip folder: ' + e.message, 'error');
+      clearFile(prefix);
+    }
+  } else {
+    const file=files[0];
+    document.getElementById(prefix+'-fname').textContent=file.name;
+    document.getElementById(prefix+'-fmeta').textContent=`${fmtBytes(file.size)} — ${file.type||'unknown type'}`;
+    fileName[prefix]=file.name; fileSize[prefix]=file.size;
+    const r=new FileReader(); r.onload=e=>fileData[prefix]=e.target.result; r.readAsArrayBuffer(file);
+  }
+}
+function clearFile(prefix) {
+  fileData[prefix]=null; fileName[prefix]=''; fileSize[prefix]=0;
+  document.getElementById(prefix+'-fname').textContent='';
+  document.getElementById(prefix+'-fmeta').textContent='';
+  document.getElementById(prefix+'-file').value='';
+  const rb=document.getElementById(prefix+'-result');
+  rb.innerHTML=''; rb.classList.remove('visible');
+}
+['enc','dec','ver'].forEach(p=>{
+  setTimeout(()=>{
+    const drop=document.getElementById(p+'-drop'); if(!drop) return;
+    drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('dragover');});
+    drop.addEventListener('dragleave',()=>drop.classList.remove('dragover'));
+    drop.addEventListener('drop',e=>{
+      e.preventDefault(); drop.classList.remove('dragover');
+      const files=e.dataTransfer.files;
+      if(!files.length) return;
+      // Re-use logic for folders in drag/drop
+      const input = document.getElementById(p+'-file');
+      input.files = files;
+      fileChosen(p);
+    });
+  },100);
+});
+
+// ENCRYPT
+async function doEncrypt(e) {
+  if (!hasPerm('encrypt')) { toast('Permission denied.','error'); return; }
+  if (!fileData.enc) { toast('Select a file first.','error'); return; }
+  const btn=e.currentTarget; btn.disabled=true;
+  const selProj = document.getElementById('enc-project-select')?.value || '';
+  let useServer = isServerMode();
+  
+  const expiresAt = document.getElementById('enc-expires')?.value || '';
+  const maxViews = document.getElementById('enc-max-views')?.value || 0;
+
+  if (selProj && apiOnline) {
+      useServer = true; // Auto-switch to server mode if saving to a project
+  } else if (selProj && !apiOnline) {
+      toast('Cannot save to project: Server is offline.', 'error');
+      btn.disabled = false;
+      return;
+  }
+  
+  if (!useServer && (expiresAt || maxViews)) {
+      toast('Self-destructing files are only supported in Server Mode.', 'warn');
+  }
+  
+  btn.innerHTML=`<span class="spinner"></span> Encrypting via ${useServer?'Server':'Browser'}…`;
+  try {
+    let outBlob, outName=fileName.enc+'.enc', contentHash, modeUsed;
+    if (useServer) {
+      // ── SERVER MODE ──
+      modeUsed='🖥 Python Backend';
+      const result = await apiEncrypt(fileData.enc, fileName.enc, selProj);
+      outBlob = result.blob;
+      contentHash = await sha256(new Uint8Array(fileData.enc));
+    } else {
+      // ── BROWSER MODE ──
+      modeUsed='🌐 Web Crypto API';
+      const salt=crypto.getRandomValues(new Uint8Array(SALT_LEN));
+      const iv=crypto.getRandomValues(new Uint8Array(IV_LEN));
+      const key=await deriveFileKey(currentUser.sessionKey,salt);
+      const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:aad(currentUser),tagLength:128},key,fileData.enc);
+      const out=new Uint8Array(SALT_LEN+IV_LEN+ct.byteLength);
+      out.set(salt,0); out.set(iv,SALT_LEN); out.set(new Uint8Array(ct),SALT_LEN+IV_LEN);
+      outBlob=new Blob([out],{type:'application/octet-stream'});
+      contentHash=await sha256(new Uint8Array(fileData.enc));
+    }
+    const url=URL.createObjectURL(outBlob);
+    const encBuf=await outBlob.arrayBuffer();
+    const encHash=await sha256(new Uint8Array(encBuf));
+    const regId=Date.now();
+    // Capture server-assigned file ID if available (from X-File-Id response header)
+    let serverFileId = null;
+    if (useServer) {
+      // Re-fetch headers from the response — we need to re-do the call for headers
+      // Instead, apiEncrypt returns headers too; grab from the response
+      serverFileId = _lastEncryptHeaders?.get('x-file-id') || null;
+    }
+    const selProjId = (useServer && document.getElementById('enc-project-select')?.value) || null;
+    const regEntry={id:regId,name:fileName.enc,encName:outName,size:fileSize.enc,contentHash,encHash,encryptedBy:currentUser.username,time:new Date().toISOString(),mode:modeUsed,serverFileId,projectId:selProjId};
+    fileRegistry.push(regEntry); saveRegistry();
+    // Store blob in memory + IndexedDB for re-download
+    encryptedBlobStore.set(regId, encBuf);
+    idbSave(regEntry, encBuf).catch(()=>{});
+    document.getElementById('reg-badge').textContent=fileRegistry.length;
+    await logAndChain('ENCRYPT',fileName.enc,'OK');
+    showResult('enc',`
+      <div class="r-row"><span class="r-k">Status</span><span class="r-v r-ok">✅ Encrypted successfully</span></div>
+      <div class="r-row"><span class="r-k">Mode</span><span class="r-v" style="color:var(--accent)">${modeUsed}</span></div>
+      <div class="r-row"><span class="r-k">Input</span><span class="r-v">${fileName.enc} (${fmtBytes(fileSize.enc)})</span></div>
+      <div class="r-row"><span class="r-k">Output</span><span class="r-v">${outName}</span></div>
+      <div class="r-row"><span class="r-k">Algorithm</span><span class="r-v">AES-256-GCM · PBKDF2(100k)</span></div>
+      <div class="r-row"><span class="r-k">Identity</span><span class="r-v">${currentUser.username} · ${currentUser.employeeId}</span></div>
+      <div class="r-row"><span class="r-k">File Hash</span><span class="r-v mono-hash">${contentHash}</span></div>
+      <div class="r-row"><span class="r-k">Block #</span><span class="r-v" style="color:var(--orange)">${blockchain.length-1} anchored to chain ⛓</span></div>
+      <a class="dl-link" href="${url}" download="${outName}">⬇ Download ${outName}</a>
+    `);
+    toast(`Encrypted via ${modeUsed} and anchored to blockchain.`,'success');
+  } catch(err) {
+    await logAndChain('ENCRYPT',fileName.enc,'FAILED');
+    showResult('enc',`<div class="r-row"><span class="r-k">Status</span><span class="r-v r-fail">❌ ${err.message}</span></div>${useServer?'<div class="r-row"><span class="r-k">Tip</span><span class="r-v" style="color:var(--muted)">Check server connection in Settings.</span></div>':''}`);
+    toast('Encryption failed.','error');
+  }
+  btn.innerHTML='🔒 Encrypt File'; btn.disabled=false;
+}
+
+// DECRYPT
+async function doDecrypt(e) {
+  if (!hasPerm('decrypt')) { toast('Permission denied.','error'); return; }
+  if (!fileData.dec) { toast('Select a .enc file first.','error'); return; }
+  const btn=e.currentTarget; btn.disabled=true;
+  const useServer = isServerMode();
+  btn.innerHTML=`<span class="spinner"></span> Decrypting via ${useServer?'Server':'Browser'}…`;
+  try {
+    const entry = fileRegistry.find(f => f.encName === fileName.dec || f.name === fileName.dec);
+    const selProjId = entry ? (entry.projectId || "") : "";
+    // Recover the original filename (with correct extension) from registry or by stripping .enc
+    let outName = entry?.name || getOriginalName(fileName.dec);
+    let outBlob, modeUsed;
+
+    if (useServer) {
+      modeUsed='🖥 Python Backend';
+      const result = await apiDecrypt(fileData.dec, fileName.dec, selProjId);
+      const _decBuf = await result.blob.arrayBuffer();
+      outBlob = new Blob([_decBuf], {type: guessMimeType(outName)});
+    } else {
+      modeUsed='🌐 Web Crypto API';
+      const data=new Uint8Array(fileData.dec);
+      const salt=data.slice(0,SALT_LEN); const iv=data.slice(SALT_LEN,SALT_LEN+IV_LEN); const ct=data.slice(SALT_LEN+IV_LEN);
+      const key=await deriveFileKey(currentUser.sessionKey,salt);
+      const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv,additionalData:aad(currentUser),tagLength:128},key,ct);
+      outBlob=new Blob([pt], {type: guessMimeType(outName)});
+    }
+
+    // Apply Forensic Watermark
+    toast('Applying forensic watermark...','info');
+    outBlob = await applyWatermark(outBlob, outName);
+    
+    const url=makeBlobUrl(await outBlob.arrayBuffer(), outName);
+    const ptBuf=await outBlob.arrayBuffer();
+    const contentHash=await sha256(new Uint8Array(ptBuf));
+    await logAndChain('DECRYPT',fileName.dec,'OK');
+    showResult('dec',`
+      <div class="r-row"><span class="r-k">Status</span><span class="r-v r-ok">✅ Decrypted successfully</span></div>
+      <div class="r-row"><span class="r-k">Mode</span><span class="r-v" style="color:var(--green)">${modeUsed}</span></div>
+      <div class="r-row"><span class="r-k">Input</span><span class="r-v">${fileName.dec}</span></div>
+      <div class="r-row"><span class="r-k">Output</span><span class="r-v">${outName} (${fmtBytes(ptBuf.byteLength)})</span></div>
+      <div class="r-row"><span class="r-k">Identity</span><span class="r-v">${currentUser.username} · ${currentUser.employeeId}</span></div>
+      <div class="r-row"><span class="r-k">Content Hash</span><span class="r-v mono-hash">${contentHash}</span></div>
+      <div class="r-row"><span class="r-k">Block #</span><span class="r-v" style="color:var(--orange)">${blockchain.length-1} anchored to chain ⛓</span></div>
+      <a class="dl-link" href="${url}" download="${outName}">⬇ Download ${outName}</a>
+      <button class="op-btn btn-neutral" style="margin-top:16px;margin-left:12px;" onclick="previewFile('${url}', '${outName}')">👁 Preview</button>
+    `);
+    toast(`Decrypted successfully via ${modeUsed}.`,'success');
+  } catch(err) {
+    await logAndChain('DECRYPT',fileName.dec,'FAILED');
+    showResult('dec',`<div class="r-row"><span class="r-k">Status</span><span class="r-v r-fail">❌ ${err.message}</span></div><div class="r-row"><span class="r-k">Reason</span><span class="r-v" style="color:var(--muted)">Server error — check backend logs.</span></div>`);
+    toast('Decryption failed.','error');
+  }
+  btn.innerHTML='🔓 Decrypt File'; btn.disabled=false;
+}
+
+// SECURE FILE PREVIEWER
+function previewFile(url, name) {
+  const ext = name.split('.').pop().toLowerCase();
+  let content = '';
+  if (['jpg','jpeg','png','gif','webp'].includes(ext)) {
+    content = `<img src="${url}" style="max-width:100%; border-radius:8px;">`;
+  } else if (['mp4','webm'].includes(ext)) {
+    content = `<video controls src="${url}" style="max-width:100%; border-radius:8px;"></video>`;
+  } else if (['mp3','wav','ogg'].includes(ext)) {
+    content = `<audio controls src="${url}" style="width:100%;"></audio>`;
+  } else if (['txt','json','md','csv','html','js','css','py'].includes(ext)) {
+    content = `<iframe src="${url}" style="width:100%; height:400px; background:#fff; border-radius:8px; border:none;"></iframe>`;
+  } else if (ext === 'pdf') {
+    content = `<iframe src="${url}" style="width:100%; height:500px; border:none; border-radius:8px;"></iframe>`;
+  } else {
+    toast('No preview available for this file type. Please download it.', 'warn');
+    return;
+  }
+  document.getElementById('modal-title').textContent = `👁 Preview: ${name}`;
+  document.getElementById('modal-inner').classList.add('wide');
+  document.getElementById('modal-body').innerHTML = content;
+  const btn = document.getElementById('modal-confirm');
+  btn.style.display = 'none';
+  document.getElementById('modal').classList.add('open');
+}
+
+// VERIFY
+async function doVerify(e) {
+  if (!hasPerm('verify')) { toast('Permission denied.','error'); return; }
+  if (!fileData.ver) { toast('Select a .enc file first.','error'); return; }
+  const btn=e.currentTarget; btn.disabled=true;
+  const useServer = isServerMode();
+  btn.innerHTML=`<span class="spinner"></span> Verifying via ${useServer?'Server':'Browser'}…`;
+  try {
+    let passed=false, modeUsed;
+    
+    const entry = fileRegistry.find(f => f.encName === fileName.ver || f.name === fileName.ver);
+    const selProjId = entry ? (entry.projectId || "") : "";
+
+    if (useServer) {
+      modeUsed='🖥 Python Backend';
+      const result = await apiVerify(fileData.ver, fileName.ver, selProjId);
+      passed = result.valid === true || result.status === 'ok';
+    } else {
+      modeUsed='🌐 Web Crypto API';
+      const data=new Uint8Array(fileData.ver);
+      const salt=data.slice(0,SALT_LEN); const iv=data.slice(SALT_LEN,SALT_LEN+IV_LEN); const ct=data.slice(SALT_LEN+IV_LEN);
+      const key=await deriveFileKey(currentUser.sessionKey,salt);
+      await crypto.subtle.decrypt({name:'AES-GCM',iv,additionalData:aad(currentUser),tagLength:128},key,ct);
+      passed=true;
+    }
+    const encHash=await sha256(new Uint8Array(fileData.ver));
+    await logAndChain('VERIFY',fileName.ver,passed?'PASSED':'FAILED');
+    if (passed) {
+      showResult('ver',`
+        <div class="r-row"><span class="r-k">Status</span><span class="r-v r-ok">✅ Integrity PASSED</span></div>
+        <div class="r-row"><span class="r-k">Mode</span><span class="r-v" style="color:var(--amber)">${modeUsed}</span></div>
+        <div class="r-row"><span class="r-k">File</span><span class="r-v">${fileName.ver}</span></div>
+        <div class="r-row"><span class="r-k">Identity</span><span class="r-v">${currentUser.username} · ${currentUser.employeeId}</span></div>
+        <div class="r-row"><span class="r-k">Enc File Hash</span><span class="r-v mono-hash">${encHash}</span></div>
+        <div class="r-row"><span class="r-k">Block #</span><span class="r-v" style="color:var(--orange)">${blockchain.length-1} anchored to chain ⛓</span></div>
+      `);
+      toast('Integrity check passed.','success');
+    } else {
+      showResult('ver',`<div class="r-row"><span class="r-k">Status</span><span class="r-v r-fail">❌ Integrity FAILED</span></div><div class="r-row"><span class="r-k">Reason</span><span class="r-v" style="color:var(--muted)">File tampered or identity mismatch.</span></div>`);
+      toast('Integrity check failed.','error');
+    }
+  } catch {
+    await logAndChain('VERIFY',fileName.ver,'FAILED');
+    showResult('ver',`<div class="r-row"><span class="r-k">Status</span><span class="r-v r-fail">❌ Integrity FAILED</span></div><div class="r-row"><span class="r-k">Reason</span><span class="r-v" style="color:var(--muted)">File tampered or identity mismatch.</span></div>`);
+    toast('Integrity check failed.','error');
+  }
+  btn.innerHTML='✅ Verify Integrity'; btn.disabled=false;
+}
+
+// LOGS
+const LOG_STYLE = {ENCRYPT:'color:var(--accent)',DECRYPT:'color:var(--green)',VERIFY:'color:var(--amber)',LOGIN_SUCCESS:'color:var(--green)',LOGIN_FAIL:'color:var(--red)',LOGOUT:'color:var(--muted)',ADD_USER:'color:var(--purple)',DELETE_USER:'color:var(--red)',MODIFY_ROLE:'color:var(--purple)',LOCK_ACCOUNT:'color:var(--red)',UNLOCK_ACCOUNT:'color:var(--green)',LOGIN_SETUP:'color:var(--cyan)'};
+
+function renderLogs() {
+  const el=document.getElementById('logs-content');
+  if (!sessionLogs.length) { el.innerHTML='<div class="empty"><div class="empty-icon">📭</div><div class="empty-txt">No log entries yet.</div></div>'; return; }
+  const rows=[...sessionLogs].reverse().map(l=>`<tr>
+    <td style="color:var(--dim);white-space:nowrap">${l.time.replace('T',' ').slice(0,19)}</td>
+    <td>${l.user}</td>
+    <td><span class="role-tag role-${l.role}">${l.role}</span></td>
+    <td><span style="font-size:11px;${LOG_STYLE[l.action]||''}">${l.action}</span></td>
+    <td style="color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.file}</td>
+    <td class="${l.status==='OK'||l.status==='PASSED'?'r-ok':'r-fail'}">${l.status==='OK'||l.status==='PASSED'?'✓':'✗'} ${l.status}</td>
+  </tr>`).join('');
+  el.innerHTML=`<table><thead><tr><th>Timestamp</th><th>User</th><th>Role</th><th>Action</th><th>File</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function clearLogs(){ sessionLogs=[]; renderLogs(); toast('Logs cleared.','info'); }
+function exportLogs(){
+  if (!sessionLogs.length) { toast('No logs to export.','warn'); return; }
+  const csv='Timestamp,User,Role,Action,File,Status\n'+sessionLogs.map(l=>`"${l.time}","${l.user}","${l.role}","${l.action}","${l.file}","${l.status}"`).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=`securefs_logs_${Date.now()}.csv`; a.click();
+  toast('Logs exported.','success');
+}
+
+// STATS
+async function renderStats(){
+  await fetchUsersFromBackend();
+  const total=Object.keys(userDB).length;
+  const locked=Object.keys(userDB).filter(u=>userDB[u].locked).length;
+  const active=total-locked;
+  const encrypts=sessionLogs.filter(l=>l.action==='ENCRYPT'&&l.status==='OK').length;
+  const chainLen=blockchain.length;
+  document.getElementById('stats-grid').innerHTML=`
+    <div class="stat-card accent"><div class="stat-val" style="color:var(--accent)">${total}</div><div class="stat-label">Total Users</div></div>
+    <div class="stat-card green"><div class="stat-val" style="color:var(--green)">${active}</div><div class="stat-label">Active Users</div></div>
+    <div class="stat-card red"><div class="stat-val" style="color:var(--red)">${locked}</div><div class="stat-label">Locked Accounts</div></div>
+    <div class="stat-card amber"><div class="stat-val" style="color:var(--amber)">${sessionLogs.length}</div><div class="stat-label">Session Events</div></div>
+    <div class="stat-card orange"><div class="stat-val" style="color:var(--orange)">${chainLen}</div><div class="stat-label">Chain Blocks</div></div>
+    <div class="stat-card purple"><div class="stat-val" style="color:var(--purple)">${encrypts}</div><div class="stat-label">Files Encrypted</div></div>`;
+  const rows=Object.entries(userDB).map(([n,u])=>`<tr>
+    <td>${n}</td><td style="color:var(--muted)">${u.employeeId}</td>
+    <td><span class="role-tag role-${u.role}">${u.role}</span></td>
+    <td>${u.locked?'<span class="badge-locked">🔒 Locked</span>':'<span class="badge-active">● Active</span>'}</td>
+  </tr>`).join('');
+  document.getElementById('stats-user-table').innerHTML=`<table><thead><tr><th>Username</th><th>Emp ID</th><th>Role</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// USER MANAGEMENT
+async function fetchUsersFromBackend() {
+  try {
+    const resp = await fetch(`${apiUrl}/users`);
+    if (resp.ok) userDB = await resp.json();
+  } catch(e) {}
+}
+
+async function renderUsers(){
+  await fetchUsersFromBackend();
+  const el=document.getElementById('users-table');
+  const canDelete=hasPerm('delete_user'),canRole=hasPerm('modify_role'),canLock=hasPerm('lock_account'),canUnlock=hasPerm('unlock_account');
+  const rows=Object.entries(userDB).map(([n,u])=>{
+    const locked=u.locked; const isSelf=n===currentUser.username;
+    let btns='';
+    if(canRole) btns+=`<button class="tbl-btn" style="color:var(--purple);border-color:rgba(167,139,250,.3)" onclick="openModifyRole('${n}')">Change Role</button>`;
+    if(locked&&canUnlock) btns+=`<button class="tbl-btn" style="color:var(--green);border-color:rgba(52,211,153,.3)" onclick="doUnlock('${n}')">Unlock</button>`;
+    if(!locked&&canLock&&!isSelf) btns+=`<button class="tbl-btn" style="color:var(--amber);border-color:rgba(251,191,36,.3)" onclick="doLock('${n}')">Lock</button>`;
+    if(canDelete&&!isSelf) btns+=`<button class="tbl-btn" style="color:var(--red);border-color:rgba(248,113,113,.3)" onclick="doDelete('${n}')">Delete</button>`;
+    return `<tr><td>${n}${isSelf?` <span style="font-size:10px;color:var(--muted)">(you)</span>`:''}</td><td style="color:var(--muted)">${u.employeeId}</td><td><span class="role-tag role-${u.role}">${u.role}</span></td><td>${locked?'<span class="badge-locked">🔒 Locked</span>':'<span class="badge-active">● Active</span>'}</td><td><div class="tbl-actions">${btns||'<span style="color:var(--dim);font-size:11px">—</span>'}</div></td></tr>`;
+  }).join('');
+  el.innerHTML=`<table><thead><tr><th>Username</th><th>Emp ID</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
+  document.getElementById('btn-add-user').style.display=hasPerm('add_user')?'inline-flex':'none';
+}
+function openAddUser(){
+  document.getElementById('modal-title').textContent='Add New User';
+  document.getElementById('modal-inner').classList.remove('wide');
+  document.getElementById('modal-body').innerHTML=`
+    <div class="field"><label>Username</label><input id="mu-name" placeholder="username" autocomplete="off"></div>
+    <div class="field"><label>Employee ID</label><input id="mu-emp" placeholder="EMP999" autocomplete="off"></div>
+    <div class="field"><label>Role</label><select id="mu-role">${Object.keys(ROLE_PERMISSIONS).map(r=>`<option>${r}</option>`).join('')}</select></div>
+    <div class="field"><label>Password</label><input type="password" id="mu-pass" placeholder="Password" oninput="checkPwStrength(this.value,'mu-strength','mu-strength-label')"><div class="pw-strength"><div class="pw-strength-bar" id="mu-strength"></div></div><div class="pw-strength-label" id="mu-strength-label"></div></div>
+    <div class="field"><label>Confirm Password</label><input type="password" id="mu-conf" placeholder="Confirm"></div>`;
+  const btn=document.getElementById('modal-confirm'); btn.textContent='Add User'; btn.className='op-btn btn-action';
+  modalCallback=addUser; document.getElementById('modal').classList.add('open');
+}
+async function addUser(){
+  const name=document.getElementById('mu-name').value.trim();
+  const emp=document.getElementById('mu-emp').value.trim();
+  const role=document.getElementById('mu-role').value;
+  const pass=document.getElementById('mu-pass').value;
+  const conf=document.getElementById('mu-conf').value;
+  if(!name||!emp||!pass){toast('All fields required.','error');return;}
+  if(pass!==conf){toast('Passwords do not match.','error');return;}
+  
+  const salt=crypto.getRandomValues(new Uint8Array(SALT_LEN));
+  const h=await hashPassword(pass,salt);
+  
+  try {
+    const resp = await fetch(`${apiUrl}/users`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username: name, employeeId: emp, role, salt: hexArr(salt), password_hash: hexArr(h)})
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(()=>({detail:'Failed to add'}));
+      toast(err.detail, 'error'); return;
+    }
+  } catch(e) {
+    toast('Server error', 'error'); return;
+  }
+  
+  await logAndChain('ADD_USER',name,'OK');
+  toast(`User "${name}" added.`,'success'); closeModal(); renderUsers();
+}
+function openModifyRole(name){
+  document.getElementById('modal-title').textContent=`Change Role — ${name}`;
+  document.getElementById('modal-inner').classList.remove('wide');
+  document.getElementById('modal-body').innerHTML=`<div class="field"><label>New Role for ${name}</label><select id="mr-role">${Object.keys(ROLE_PERMISSIONS).map(r=>`<option ${r===userDB[name].role?'selected':''}>${r}</option>`).join('')}</select></div>`;
+  const btn=document.getElementById('modal-confirm'); btn.textContent='Update Role'; btn.className='op-btn btn-action';
+  modalCallback=async()=>{
+    const role=document.getElementById('mr-role').value;
+    try {
+      await fetch(`${apiUrl}/users/${name}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({role})
+      });
+    } catch(e) {}
+    await logAndChain('MODIFY_ROLE',name,'OK');
+    toast(`Role updated to ${role}.`,'success'); closeModal(); renderUsers();
+  };
+  document.getElementById('modal').classList.add('open');
+}
+async function doLock(name){ 
+  await fetch(`${apiUrl}/users/${name}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({locked:true})});
+  await logAndChain('LOCK_ACCOUNT',name,'OK'); toast(`Account "${name}" locked.`,'warn'); renderUsers(); 
+}
+async function doUnlock(name){ 
+  await fetch(`${apiUrl}/users/${name}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({locked:false})});
+  await logAndChain('UNLOCK_ACCOUNT',name,'OK'); toast(`Account "${name}" unlocked.`,'success'); renderUsers(); 
+}
+function doDelete(name){
+  document.getElementById('modal-title').textContent='Delete User';
+  document.getElementById('modal-inner').classList.remove('wide');
+  document.getElementById('modal-body').innerHTML=`<p style="font-size:13px;color:var(--muted);line-height:1.7">Are you sure you want to delete <strong style="color:var(--text)">${name}</strong>? This cannot be undone.</p>`;
+  const btn=document.getElementById('modal-confirm'); btn.textContent='Delete'; btn.className='op-btn btn-danger';
+  modalCallback=async()=>{ 
+    await fetch(`${apiUrl}/users/${name}`, {method:'DELETE'});
+    await logAndChain('DELETE_USER',name,'OK'); toast(`User "${name}" deleted.`,'success'); closeModal(); renderUsers(); 
+  };
+  document.getElementById('modal').classList.add('open');
+}
+
+// FILE REGISTRY
+async function renderRegistry(){
+  const el=document.getElementById('registry-content');
+  
+  let mergedFiles = [...fileRegistry];
+  let serverFiles = [];
+  
+  if (apiOnline) {
+    const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'DEVELOPER';
+    try {
+      const resp = await fetch(`${apiUrl}/files?username=${encodeURIComponent(currentUser.username)}&is_admin=${isAdmin}`, {signal:AbortSignal.timeout(8000)});
+      if (resp.ok) {
+        const data = await resp.json();
+        serverFiles = data.files || [];
+      }
+    } catch(e) {}
+  }
+
+  for (const sf of serverFiles) {
+    if (!mergedFiles.find(f => f.serverFileId === sf.id)) {
+      mergedFiles.push({
+        id: sf.id,
+        name: sf.original_name,
+        encName: sf.enc_name,
+        size: sf.size,
+        contentHash: sf.enc_hash,
+        time: sf.time,
+        encryptedBy: sf.encrypted_by,
+        mode: '🖥 Server',
+        serverFileId: sf.id,
+        projectId: sf.project_id,
+        lastAccessed: sf.last_accessed || sf.time
+      });
+    } else {
+      const lf = mergedFiles.find(f => f.serverFileId === sf.id);
+      lf.lastAccessed = sf.last_accessed || sf.time;
+      lf.projectId = sf.project_id;
+    }
+  }
+
+  document.getElementById('reg-badge').textContent=mergedFiles.length;
+  if (!mergedFiles.length){ el.innerHTML='<div class="empty"><div class="empty-icon">🗂</div><div class="empty-txt">No files in history.</div></div>'; return; }
+  
+  const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'DEVELOPER';
+
+  el.innerHTML=mergedFiles.sort((a,b)=>a.time < b.time ? 1 : -1).map(f=>{
+    const inMemory=encryptedBlobStore.has(f.id);
+    const hasServer=!!(f.serverFileId && apiOnline);
+    const canDownload=inMemory||hasServer;
+    const isOwner = f.encryptedBy === currentUser.username;
+    const canShare = hasServer && !f.projectId && isOwner;
+    
+    const sourceTag = inMemory
+      ? `<span style="font-size:9px;padding:2px 6px;border-radius:100px;background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.2)" title="Cached in browser">💾 Local</span>`
+      : hasServer
+        ? `<span style="font-size:9px;padding:2px 6px;border-radius:100px;background:rgba(56,189,248,.1);color:var(--accent);border:1px solid rgba(56,189,248,.2)" title="Stored on server">🖥 Server</span>`
+        : `<span style="font-size:9px;padding:2px 6px;border-radius:100px;background:rgba(100,116,139,.1);color:var(--muted);border:1px solid rgba(100,116,139,.2)" title="Not available">✗ Unavailable</span>`;
+    
+    let dlBtn = '';
+    if (canDownload) {
+        if (!isOwner && isAdmin) {
+            if (hasServer) {
+                dlBtn = `<button class="tbl-btn" style="color:var(--orange);border-color:rgba(251,146,60,.3)" onclick="adminDecryptFile('${f.serverFileId}','${f.name}')">🔓 Admin Decrypt</button>`;
+            } else if (inMemory) {
+                dlBtn = `<button class="tbl-btn" style="color:var(--orange);border-color:rgba(251,146,60,.3)" onclick="adminDecryptLocalFile('${f.id}','${f.encryptedBy}','${f.name}')">🔓 Admin Decrypt (Local)</button>`;
+            }
+        } else {
+            dlBtn = `
+              <div style="display:flex;gap:4px;justify-content:flex-end">
+                <button class="tbl-btn" style="color:var(--muted);border-color:rgba(255,255,255,.1);padding:4px 8px" onclick="redownloadFile('${f.id}')" title="Download Encrypted Raw">⬇ Encrypted</button>
+                <button class="tbl-btn" style="color:var(--green);border-color:rgba(52,211,153,.3);padding:4px 8px" onclick="quickDecrypt('${f.id}','${f.name}')" title="Decrypt and Save Local Copy">🔓 Decrypt</button>
+              </div>
+            `;
+        }
+    }
+
+    const shareBtn=canShare
+      ? `<button class="tbl-btn" style="color:var(--accent);border-color:rgba(56,189,248,.3)" onclick="openShareModal('${f.serverFileId}', '${f.id}')">🔗 Share</button>`
+      : '';
+    const delBtn=isOwner ? `<button class="tbl-btn" style="color:var(--red);border-color:rgba(248,113,113,.3)" onclick="deleteRegistryEntry('${f.id}')" title="Remove">✕</button>` : '';
+    
+    const adminDetails = isAdmin && !isOwner ? `
+      <div style="margin-top:6px;font-size:11px;color:var(--dim);display:flex;gap:12px;background:var(--surface2);padding:6px 10px;border-radius:6px">
+        <span><strong style="color:var(--orange)">Owner:</strong> ${f.encryptedBy}</span>
+        <span><strong style="color:var(--orange)">Last Accessed:</strong> ${(f.lastAccessed||f.time).replace('T',' ').slice(0,19)}</span>
+      </div>
+    ` : '';
+
+    return `
+    <div class="registry-item" id="reg-item-${f.id}">
+      <div class="registry-icon">${fileIcon(f.name)}</div>
+      <div class="registry-info">
+        <div class="registry-name">${f.encName}</div>
+        <div class="registry-meta"><span>${fmtBytes(f.size)}</span><span>by ${f.encryptedBy}</span><span>${f.time.replace('T',' ').slice(0,19)}</span><span style="color:var(--dim)">${f.mode||''}</span></div>
+        <div class="registry-hash">SHA-256: ${f.contentHash}</div>
+        ${adminDetails}
+      </div>
+      <div class="registry-actions" style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+        ${sourceTag}
+        ${dlBtn}
+        ${shareBtn}
+        ${delBtn}
+        <span class="badge-chain">⛓ Anchored</span>
+      </div>
+    </div>`;
+  }).join('');
+  window._currentRegistryView = mergedFiles;
+}
+
+async function adminDecryptFile(serverFileId, originalName) {
+    try {
+        toast('Requesting admin decryption from server...', 'info');
+        const resp = await fetch(`${apiUrl}/admin/decrypt/${serverFileId}?admin_username=${encodeURIComponent(currentUser.username)}`, {
+            headers: {'X-Session-Token': hexArr(currentUser.sessionKey)},
+            signal: AbortSignal.timeout(30000)
+        });
+        if (!resp.ok) {
+            const e = await resp.json().catch(()=>({detail:'HTTP '+resp.status}));
+            throw new Error(e.detail);
+        }
+        // Use the stored original filename (e.g. photo.png, report.pdf)
+        const downloadName = originalName || 'decrypted_file';
+        const buf = await resp.arrayBuffer();
+        const url = makeBlobUrl(buf, downloadName);
+        triggerDownload(url, downloadName);
+        toast('Admin Decryption successful! Saved as: ' + downloadName, 'success');
+        renderRegistry();
+    } catch(e) {
+        toast('Admin Decrypt failed: ' + e.message, 'error');
+    }
+}
+
+async function adminDecryptLocalFile(localId, ownerUsername, originalName) {
+    try {
+        toast('Sending local file to server for admin decryption...', 'info');
+        const encBuf = encryptedBlobStore.get(Number(localId));
+        if (!encBuf) throw new Error('Local file blob not found in browser memory.');
+        const downloadName = originalName || 'decrypted_file';
+        const form = new FormData();
+        // Send the original filename so server returns it in Content-Disposition
+        form.append('file', new Blob([encBuf]), (downloadName + '.enc'));
+        form.append('admin_username', currentUser.username);
+        form.append('owner_username', ownerUsername);
+        const resp = await fetch(`${apiUrl}/admin/decrypt_local`, {
+            method: 'POST',
+            body: form,
+            headers: {'X-Session-Token': hexArr(currentUser.sessionKey)},
+            signal: AbortSignal.timeout(30000)
+        });
+        if (!resp.ok) {
+             const e = await resp.json().catch(()=>({detail:'HTTP ' + resp.status}));
+             throw new Error(e.detail);
+        }
+        const buf = await resp.arrayBuffer();
+        const url = makeBlobUrl(buf, downloadName);
+        triggerDownload(url, downloadName);
+        toast('Admin Decryption successful! Saved as: ' + downloadName, 'success');
+    } catch(e) {
+        toast('Admin Decrypt failed: ' + e.message, 'error');
+    }
+}
+
+async function redownloadFile(id){
+  const entry = (window._currentRegistryView || []).find(f => String(f.id) === String(id)) || fileRegistry.find(f => String(f.id) === String(id));
+  if (!entry){ toast('Registry entry not found.','error'); return; }
+
+  // 1. Try in-memory first (fastest)
+  let buf = encryptedBlobStore.get(id) || null;
+
+  // 2. Try IndexedDB (persists across sessions)
+  if (!buf) {
+    const rec = await idbGet(id);
+    if (rec?.buffer) { buf = rec.buffer; encryptedBlobStore.set(id, buf); }
+  }
+
+  // 3. Try server if online and has a serverFileId
+  if (!buf && entry.serverFileId && apiOnline) {
+    try {
+      const resp = await fetch(`${apiUrl}/files/${entry.serverFileId}?username=${encodeURIComponent(currentUser.username)}`, {signal: AbortSignal.timeout(15000)});
+      if (resp.ok) {
+        buf = await resp.arrayBuffer();
+        encryptedBlobStore.set(id, buf);
+        idbSave(entry, buf).catch(()=>{});  // cache it locally for next time
+      }
+    } catch(e) {
+      toast('Server fetch failed: '+e.message,'error'); return;
+    }
+  }
+
+  if (!buf) {
+    toast('File not available — not in local cache and server is offline or has no record.','warn');
+    return;
+  }
+
+  const blob=new Blob([buf],{type:'application/octet-stream'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=entry.encName; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+  toast(`Downloading ${entry.encName}…`,'success');
+}
+
+async function deleteRegistryEntry(id){
+  const entry = (window._currentRegistryView || []).find(f => String(f.id) === String(id)) || fileRegistry.find(f => String(f.id) === String(id));
+  if (!entry) return;
+  // Remove from server if possible
+  if (entry.serverFileId && apiOnline) {
+    fetch(`${apiUrl}/files/${entry.serverFileId}?username=${encodeURIComponent(currentUser.username)}`,{method:'DELETE'}).catch(()=>{});
+  }
+  // Remove from IDB
+  idbDelete(id).catch(()=>{});
+  // Remove from memory
+  encryptedBlobStore.delete(id);
+  // Remove from registry
+  fileRegistry=fileRegistry.filter(f=>String(f.id)!==String(id));
+  saveRegistry();
+  renderRegistry();
+  toast(`Removed ${entry.encName} from registry.`,'info');
+}
+function clearRegistry(){ fileRegistry=[]; saveRegistry(); renderRegistry(); toast('Registry cleared.','info'); }
+
+// BLOCKCHAIN EXPLORER
+function renderBlockchain(){
+  const summary=document.getElementById('chain-summary');
+  const explorer=document.getElementById('chain-explorer');
+  updateChainUI();
+  summary.innerHTML=`
+    <div class="chain-stat"><div class="chain-stat-val">${blockchain.length}</div><div class="chain-stat-label">Total Blocks</div></div>
+    <div style="width:1px;height:36px;background:var(--border)"></div>
+    <div class="chain-stat"><div class="chain-stat-val" style="color:var(--green)">${blockchain.filter(b=>b.data?.status==='OK'||b.data?.status==='PASSED').length}</div><div class="chain-stat-label">Successful Ops</div></div>
+    <div style="width:1px;height:36px;background:var(--border)"></div>
+    <div class="chain-stat"><div class="chain-stat-val" style="color:var(--red)">${blockchain.filter(b=>b.data?.status==='FAIL'||b.data?.status==='FAILED').length}</div><div class="chain-stat-label">Failed Ops</div></div>
+    <div style="width:1px;height:36px;background:var(--border)"></div>
+    <div class="chain-stat"><div class="chain-stat-val" style="color:var(--accent)">${blockchain.filter(b=>b.data?.action==='ENCRYPT').length}</div><div class="chain-stat-label">Encryptions</div></div>`;
+  
+  const canvas = document.getElementById('chain-canvas');
+  if (!blockchain.length){ 
+    explorer.innerHTML='<div class="empty"><div class="empty-icon">⛓</div><div class="empty-txt">No blocks yet. Perform any action to create the first block.</div></div>'; 
+    canvas.style.display='none';
+    return; 
+  }
+  
+  // Draw Live Blockchain Visualization
+  canvas.style.display='block';
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const blocks = [...blockchain].slice(-10); // Show last 10 blocks
+  const nodeW = 70, nodeH = 50;
+  const startX = 60, startY = 65, spacing = 95;
+  
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 2;
+  // Draw lines
+  ctx.beginPath();
+  ctx.moveTo(startX + nodeW/2, startY + nodeH/2);
+  for(let i=1; i<blocks.length; i++) {
+    ctx.lineTo(startX + i*spacing + nodeW/2, startY + nodeH/2);
+  }
+  ctx.stroke();
+
+  // Draw nodes
+  blocks.forEach((b, i) => {
+    const x = startX + i*spacing;
+    const y = startY;
+    const actionColor={ENCRYPT:'#38bdf8',DECRYPT:'#34d399',VERIFY:'#fbbf24',LOGIN_SUCCESS:'#34d399',LOGIN_FAIL:'#f87171',ADD_USER:'#a78bfa',DELETE_USER:'#f87171'}[b.data?.action]||'#a1a1aa';
+    const actionText = (b.data?.action || 'GENESIS').replace('LOGIN_SUCCESS','LOGIN').replace('LOGIN_FAIL','FAILED');
+    
+    // Node box
+    ctx.fillStyle = 'rgba(39,39,42,0.8)';
+    ctx.fillRect(x, y, nodeW, nodeH);
+    ctx.strokeStyle = actionColor;
+    ctx.strokeRect(x, y, nodeW, nodeH);
+    
+    // Node text
+    ctx.fillStyle = '#fff';
+    ctx.font = '11px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText('#' + b.index, x + nodeW/2, y + 20);
+    ctx.fillStyle = actionColor;
+    ctx.font = 'bold 9px Inter';
+    ctx.fillText(actionText, x + nodeW/2, y + 36);
+  });
+
+  explorer.innerHTML=[...blockchain].reverse().map(b=>{
+    const isGenesis=b.index===0;
+    const actionColor={ENCRYPT:'var(--accent)',DECRYPT:'var(--green)',VERIFY:'var(--amber)',LOGIN_SUCCESS:'var(--green)',LOGIN_FAIL:'var(--red)',LOGOUT:'var(--muted)',ADD_USER:'var(--purple)',DELETE_USER:'var(--red)',MODIFY_ROLE:'var(--purple)',LOCK_ACCOUNT:'var(--red)',UNLOCK_ACCOUNT:'var(--green)',LOGIN_SETUP:'var(--cyan)'}[b.data?.action]||'var(--muted)';
+    return `<div class="block-card">
+      <div class="block-header">
+        <span class="block-num">#${b.index}</span>
+        <span class="block-action" style="color:${actionColor}">${b.data?.action||'GENESIS'}</span>
+        ${b.data?.user?`<span style="font-size:10px;color:var(--muted)">${b.data.user}</span>`:''}
+        ${b.data?.file&&b.data.file!=='-'?`<span style="font-size:10px;color:var(--dim)">${b.data.file}</span>`:''}
+        <span class="block-time">${(b.timestamp||'').replace('T',' ').slice(0,19)}</span>
+      </div>
+      <div class="block-hashes">
+        <div class="block-hash-row"><span class="block-hash-label">Block Hash</span><span class="block-hash-val">${b.hash}</span></div>
+        <div class="block-hash-row"><span class="block-hash-label">Prev Hash</span><span class="block-hash-val ${isGenesis?'genesis':''}">${b.previousHash}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// SETTINGS — CHANGE PASSWORD
+async function changePassword(){
+  const oldP=document.getElementById('set-old').value;
+  const newP=document.getElementById('set-new').value;
+  const confP=document.getElementById('set-conf').value;
+  if (!oldP||!newP||!confP){toast('All fields required.','error');return;}
+  if (newP!==confP){toast('New passwords do not match.','error');return;}
+  
+  // Need the salt to verify old password. In reality the backend should do this.
+  // We'll just try to login with the old password to verify it.
+  try {
+    let saltB;
+    const sResp = await fetch(`${apiUrl}/users/${currentUser.username}/salt`);
+    if(!sResp.ok) throw new Error('User not found');
+    const sData = await sResp.json();
+    saltB = arrHex(sData.salt);
+    
+    const oldH = await hashPassword(oldP, saltB);
+    const lResp = await fetch(`${apiUrl}/login`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: currentUser.username, password_hash: hexArr(oldH)})
+    });
+    if(!lResp.ok) { toast('Current password is incorrect.','error'); return; }
+  } catch(e) {
+    toast('Error verifying old password.','error'); return;
+  }
+  
+  const newSalt=crypto.getRandomValues(new Uint8Array(SALT_LEN));
+  const newH=await hashPassword(newP,newSalt);
+  
+  try {
+    await fetch(`${apiUrl}/users/${currentUser.username}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({salt: hexArr(newSalt), password_hash: hexArr(newH)})
+    });
+  } catch(e) {}
+  
+  const newSK=await deriveSessionKey(newH); currentUser.sessionKey=newSK;
+  await logAndChain('CHANGE_PASSWORD','-','OK');
+  document.getElementById('set-old').value=''; document.getElementById('set-new').value=''; document.getElementById('set-conf').value='';
+  document.getElementById('set-strength').style.width='0'; document.getElementById('set-strength-label').textContent='';
+  toast('Password changed successfully.','success');
+}
+
+function resetAllData(){
+  document.getElementById('modal-title').textContent='Reset All Data';
+  document.getElementById('modal-inner').classList.remove('wide');
+  document.getElementById('modal-body').innerHTML=`<p style="font-size:13px;color:var(--muted);line-height:1.7">This will permanently delete all user accounts, the blockchain ledger, and the file registry. The admin account will be reset to its default state.<br><br><strong style="color:var(--red)">This action cannot be undone.</strong></p>`;
+  const btn=document.getElementById('modal-confirm'); btn.textContent='Reset Everything'; btn.className='op-btn btn-danger';
+  modalCallback=()=>{
+    localStorage.clear();
+    blockchain=[]; fileRegistry=[];
+    closeModal(); logout(); toast('Local Data reset.','warn');
+  };
+  document.getElementById('modal').classList.add('open');
+}
+
+// MODAL
+function closeModal(){ document.getElementById('modal').classList.remove('open'); modalCallback=null; }
+function modalConfirm(){ if(modalCallback) modalCallback(); }
+document.getElementById('modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
+
+// UTILS
+function showResult(prefix,html){ const el=document.getElementById(prefix+'-result'); el.innerHTML=html; el.classList.add('visible'); }
+function toast(msg,type='info'){
+  const icons={success:'✅',error:'❌',info:'ℹ️',warn:'⚠️'};
+  const el=document.createElement('div'); el.className='toast '+type;
+  el.innerHTML=`<span class="t-icon">${icons[type]}</span><span>${msg}</span>`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{el.style.cssText='opacity:0;transform:translateX(16px);transition:all 0.3s';setTimeout(()=>el.remove(),300);},3500);
+}
+
+async function quickDecrypt(fileId, fileName) {
+  toast('Fetching encrypted file...', 'info');
+  try {
+    const res = await fetch(`${apiUrl}/files/${fileId}`, {
+      headers: { 'X-Session-Token': hexArr(currentUser.sessionKey) }
+    });
+    if (!res.ok) throw new Error('File not found or access denied');
+    
+    const encryptedBlob = await res.blob();
+    const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
+    
+    // Auto-decryption attempt using current user session key
+    toast('Attempting identity-bound decryption...', 'info');
+    try {
+      const decrypted = await decryptFile(encryptedData, currentUser.username);
+      downloadBlob(decrypted, fileName.replace('.enc', ''), 'application/octet-stream');
+      toast('File decrypted successfully', 'success');
+    } catch (e) {
+      // Fallback: Ask for password/key
+      const key = prompt("Identity-bound decryption failed. This file might have been encrypted by another user. Enter decryption key or original password:");
+      if (!key) return;
+      const decrypted = await decryptFile(encryptedData, key);
+      downloadBlob(decrypted, fileName.replace('.enc', ''), 'application/octet-stream');
+      toast('File decrypted successfully', 'success');
+    }
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+function downloadBlob(data, name, type) {
+  const blob = new Blob([data], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// API INTEGRATION — BACKEND CONNECTIVITY
+let defaultApiUrl = (window.location.hostname && window.location.protocol !== 'file:') 
+  ? window.location.origin 
+  : 'http://127.0.0.1:8443';
+let apiUrl = localStorage.getItem('sfs_api_url') || defaultApiUrl;
+let apiMode = 'server';
+let apiOnline = false;
+let apiPingTimer = null;
+
+function saveApiUrl() {
+  const val = document.getElementById('api-url-input')?.value?.trim();
+  if (!val) { toast('Enter a URL first.','error'); return; }
+  apiUrl = val.replace(/\/$/,'');
+  localStorage.setItem('sfs_api_url', apiUrl);
+  toast('API URL saved.','success');
+  pingApi();
+}
+
+function toggleApiConfig() {
+  if (!currentUser) {
+    const current = apiUrl;
+    const newUrl = prompt("Enter Backend API URL (e.g., http://192.168.1.5:8443):", current);
+    if (newUrl) {
+      apiUrl = newUrl.replace(/\/$/,'');
+      localStorage.setItem('sfs_api_url', apiUrl);
+      pingApi();
+      toast('API URL updated.', 'success');
+    }
+    return;
+  }
+  // Navigate to settings panel and scroll to API card
+  const settingsNav = document.querySelector('[data-panel="settings"]');
+  if (settingsNav) nav(settingsNav);
+  setTimeout(()=>{ document.getElementById('api-config-card')?.scrollIntoView({behavior:'smooth',block:'start'}); }, 150);
+}
+
+function setMode(mode) {
+  // Mode toggle removed, defaulting to server
+}
+
+function setApiStatus(state) { // 'online' | 'offline' | 'checking'
+  const wasOnline = apiOnline;
+  apiOnline = state === 'online';
+  const pill = document.getElementById('api-pill');
+  const dot = document.getElementById('api-dot');
+  const text = document.getElementById('api-pill-text');
+  if (!pill) return;
+  if (state === 'offline') {
+    pill.style.display = 'flex';
+    pill.className = `api-status-pill offline`;
+    dot.className = `api-status-dot offline`;
+    text.textContent = 'Backend Offline';
+  } else {
+    pill.style.display = 'none';
+  }
+  // Re-render registry if online status changed (Download buttons may appear/disappear)
+  if (wasOnline !== apiOnline && apiOnline) { loadProjects(); }
+  if (wasOnline !== apiOnline && document.getElementById('panel-registry')?.classList.contains('active')) {
+    renderRegistry();
+  }
+}
+
+async function pingApi() {
+  const urlInput = document.getElementById('api-url-input');
+  const targetUrl = (urlInput?.value?.trim() || apiUrl).replace(/\/$/,'');
+  const resultEl = document.getElementById('api-ping-result');
+  setApiStatus('checking');
+  const t0 = Date.now();
+  try {
+    const resp = await fetch(`${targetUrl}/ping`, {method:'GET', signal:AbortSignal.timeout(4000)});
+    const ms = Date.now()-t0;
+    if (resp.ok) {
+      let data = {};
+      try { data = await resp.json(); } catch(e) {}
+      setApiStatus('online');
+      if (resultEl) {
+        resultEl.style.display='block';
+        resultEl.innerHTML=`<span style="color:var(--green)">✓ Backend reachable</span> · ${ms}ms response<br>
+        <span style="color:var(--muted)">URL: ${targetUrl}</span><br>
+        ${data.version ? `<span style="color:var(--muted)">Version: ${data.version}</span><br>` : ''}
+        ${data.status ? `<span style="color:var(--muted)">Status: ${data.status}</span>` : ''}`;
+      }
+      toast(`Backend online · ${ms}ms`,'success');
+    } else {
+      throw new Error(`HTTP ${resp.status}`);
+    }
+  } catch(err) {
+    const ms = Date.now()-t0;
+    setApiStatus('offline');
+    if (resultEl) {
+      resultEl.style.display='block';
+      resultEl.innerHTML=`<span style="color:var(--red)">✗ Backend unreachable</span> — ${err.message}<br>
+      <span style="color:var(--muted)">Tried: ${targetUrl}/ping</span><br>
+      <span style="color:var(--dim)">Start server with: <code style="color:var(--accent)">py server.py --http</code></span>`;
+    }
+    if (ms < 3900) toast(`Backend offline: ${err.message}`,'warn');
+  }
+}
+
+// Auto-ping every 15s when logged in
+function startApiPolling() {
+  pingApi();
+  apiPingTimer = setInterval(pingApi, 15000);
+  // Populate input with saved URL
+  const urlInput = document.getElementById('api-url-input');
+  if (urlInput) urlInput.value = apiUrl;
+  // Apply saved mode
+  setMode(apiMode);
+}
+function stopApiPolling() { if(apiPingTimer) { clearInterval(apiPingTimer); apiPingTimer=null; } }
+
+// ── API-AWARE OPERATION WRAPPERS ──────────────────────────
+
+let _lastEncryptHeaders = null;
+
+async function apiEncrypt(fileBuffer, filename, projectId="", expiresAt="", maxViews=0) {
+  // Sends file to backend, gets .enc back
+  const form = new FormData();
+  form.append('file', new Blob([fileBuffer]), filename);
+  form.append('username', currentUser.username);
+  form.append('employee_id', currentUser.employeeId);
+  if (projectId) form.append('project_id', projectId);
+  if (expiresAt) form.append('expires_at', expiresAt);
+  if (maxViews) form.append('max_views', maxViews);
+  const resp = await fetch(`${apiUrl}/encrypt`, {
+    method:'POST', body:form,
+    headers:{'X-Session-Token': hexArr(currentUser.sessionKey)},
+    signal: AbortSignal.timeout(30000)
+  });
+  if (!resp.ok) { const e=await resp.json().catch(()=>({detail:'Unknown error'})); throw new Error(e.detail||`HTTP ${resp.status}`); }
+  _lastEncryptHeaders = resp.headers;
+  return {blob: await resp.blob(), headers: resp.headers};
+}
+
+async function apiDecrypt(encBuffer, filename, projectId="") {
+  const form = new FormData();
+  form.append('file', new Blob([encBuffer]), filename);
+  form.append('username', currentUser.username);
+  form.append('employee_id', currentUser.employeeId);
+  if (projectId) form.append('project_id', projectId);
+  const resp = await fetch(`${apiUrl}/decrypt`, {
+    method:'POST', body:form,
+    headers:{'X-Session-Token': hexArr(currentUser.sessionKey)},
+    signal: AbortSignal.timeout(30000)
+  });
+  if (!resp.ok) { const e=await resp.json().catch(()=>({detail:'Unknown error'})); throw new Error(e.detail||`HTTP ${resp.status}`); }
+  return {blob: await resp.blob(), headers: resp.headers};
+}
+
+async function apiVerify(encBuffer, filename, projectId="") {
+  const form = new FormData();
+  form.append('file', new Blob([encBuffer]), filename);
+  form.append('username', currentUser.username);
+  form.append('employee_id', currentUser.employeeId);
+  if (projectId) form.append('project_id', projectId);
+  const resp = await fetch(`${apiUrl}/verify`, {
+    method:'POST', body:form,
+    headers:{'X-Session-Token': hexArr(currentUser.sessionKey)},
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!resp.ok) { const e=await resp.json().catch(()=>({detail:'Unknown error'})); throw new Error(e.detail||`HTTP ${resp.status}`); }
+  return resp.json();
+}
+
+function getModeLabel() {
+  return '🖥 Server';
+}
+function isServerMode() {
+  return true;
+}
+
+// Sync server manifest → registry: attach serverFileId to entries that don't have one
+async function syncServerFileIds() {
+  if (!apiOnline) return;
+  try {
+    const resp = await fetch(`${apiUrl}/files?username=${encodeURIComponent(currentUser.username)}`, {signal: AbortSignal.timeout(5000)});
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const serverFiles = data.files || [];
+    let changed = false;
+    for (const sf of serverFiles) {
+      // Match by enc_name + encrypted_by
+      const entry = fileRegistry.find(r => r.encName === sf.enc_name && r.encryptedBy === sf.encrypted_by && !r.serverFileId);
+      if (entry) { entry.serverFileId = sf.id; changed = true; }
+    }
+    if (changed) { saveRegistry(); renderRegistry(); }
+  } catch(e) {}
+}
+
+// Patch showMain to start polling
+const _origShowMain = showMain;
+showMain = function() {
+  _origShowMain();
+  startApiPolling();
+  // Hydrate blob store from IDB so older-session files show Download button immediately
+  hydrateFromIDB().then(() => {
+    if (document.getElementById('panel-registry')?.classList.contains('active')) renderRegistry();
+  }).catch(()=>{});
+  // After first ping completes, sync server file IDs into registry entries
+  setTimeout(syncServerFileIds, 2000);
+  // Load projects after server confirmed
+  setTimeout(()=>{ if(apiOnline) loadProjects(); }, 3000);
+};
+
+// Patch logout to stop polling
+const _origLogout = logout;
+logout = function() {
+  stopApiPolling();
+  setApiStatus('offline');
+  _origLogout();
+};
+
+
+
+// PROJECTS — API helpers
+
+async function loadProjects() {
+  if (!apiOnline) { toast('Server offline — projects require server mode.','warn'); return; }
+  try {
+    const resp = await fetch(`${apiUrl}/projects?username=${encodeURIComponent(currentUser.username)}`, {signal:AbortSignal.timeout(8000)});
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    const data = await resp.json();
+    projectsCache = data.projects || [];
+    const badge = document.getElementById('proj-badge');
+    if (badge) badge.textContent = projectsCache.length;
+    populateProjectSelector();
+    renderProjects();
+  } catch(e) {
+    toast('Could not load projects: '+e.message,'error');
+  }
+}
+
+function populateProjectSelector() {
+  const sel = document.getElementById('enc-project-select');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Personal file, no project —</option>';
+  const editable = projectsCache.filter(p => p.my_role === 'owner' || p.my_role === 'editor');
+  editable.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  if (prev) sel.value = prev;
+}
+
+async function createProject(name, description, color) {
+  const resp = await fetch(`${apiUrl}/projects`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:currentUser.username,name,description,color}),
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!resp.ok) { const e=await resp.json().catch(()=>({detail:'Error'})); throw new Error(e.detail); }
+  return resp.json();
+}
+
+async function addMember(projectId, newUsername, role) {
+  const resp = await fetch(`${apiUrl}/projects/${projectId}/members`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:currentUser.username,new_username:newUsername,role}),
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!resp.ok) { const e=await resp.json().catch(()=>({detail:'Error'})); throw new Error(e.detail); }
+  return resp.json();
+}
+
+async function removeMember(projectId, targetUsername) {
+  const resp = await fetch(`${apiUrl}/projects/${projectId}/members/${encodeURIComponent(targetUsername)}?username=${encodeURIComponent(currentUser.username)}`, {
+    method:'DELETE', signal:AbortSignal.timeout(8000)
+  });
+  if (!resp.ok) { const e=await resp.json().catch(()=>({detail:'Error'})); throw new Error(e.detail); }
+  return resp.json();
+}
+
+async function deleteProject(projectId) {
+  const resp = await fetch(`${apiUrl}/projects/${projectId}?username=${encodeURIComponent(currentUser.username)}`, {
+    method:'DELETE', signal:AbortSignal.timeout(8000)
+  });
+  if (!resp.ok) { const e=await resp.json().catch(()=>({detail:'Error'})); throw new Error(e.detail); }
+  return resp.json();
+}
+
+async function loadProjectFiles(projectId) {
+  const resp = await fetch(`${apiUrl}/projects/${projectId}/files?username=${encodeURIComponent(currentUser.username)}`, {signal:AbortSignal.timeout(8000)});
+  if (!resp.ok) throw new Error('HTTP '+resp.status);
+  return resp.json();
+}
+
+// PROJECTS — Render
+
+const PROJ_COLORS = ['#38bdf8','#34d399','#f472b6','#fbbf24','#a78bfa','#fb923c','#22d3ee','#60a5fa'];
+const ROLE_ICONS = {owner:'👑',editor:'✏️',viewer:'👁'};
+
+function renderProjects() {
+  const el = document.getElementById('projects-list');
+  if (!el) return;
+
+  if (!apiOnline) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">🔌</div><div class="empty-txt">Connect to server to use Projects.<br><span style="font-size:10px">Switch to Server mode in Settings and ping the backend.</span></div></div>`;
+    return;
+  }
+
+  if (!projectsCache.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📁</div><div class="empty-txt">No projects yet.<br><span style="font-size:10px">Create one above to group files and share with teammates.</span></div></div>`;
+    return;
+  }
+
+  el.innerHTML = projectsCache.map(p => {
+    const roleIcon = ROLE_ICONS[p.my_role] || '👁';
+    const canEdit  = p.my_role === 'owner' || p.my_role === 'editor';
+    const isOwner  = p.my_role === 'owner';
+    const memberPills = (p.members || []).slice(0,5).map(m =>
+      `<span style="font-size:9px;padding:2px 7px;border-radius:100px;background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--border)">${m.username} <span style="color:var(--dim)">${ROLE_ICONS[m.role]||''}</span></span>`
+    ).join('');
+    const moreMembers = (p.members||[]).length > 5 ? `<span style="font-size:9px;color:var(--dim)">+${(p.members||[]).length-5} more</span>` : '';
+
+    return `
+    <div class="card" style="border-left:3px solid ${p.color||'#38bdf8'};margin-bottom:14px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:5px">
+            <span style="font-size:15px">📁</span>
+            <span style="font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px">${p.name}</span>
+            <span style="font-size:10px;padding:2px 7px;border-radius:100px;background:rgba(255,255,255,.05);border:1px solid var(--border2);color:var(--muted)">${roleIcon} ${p.my_role}</span>
+          </div>
+          ${p.description ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">${p.description}</div>` : ''}
+          <div style="display:flex;gap:16px;font-size:11px;color:var(--dim);margin-bottom:10px;flex-wrap:wrap">
+            <span>📄 ${p.file_count||0} file${p.file_count!==1?'s':''}</span>
+            <span>👥 ${p.member_count||1} member${p.member_count!==1?'s':''}</span>
+            <span>🕐 ${(p.created||'').slice(0,10)}</span>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${memberPills}${moreMembers}</div>
+        </div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap;flex-shrink:0">
+          <button class="tbl-btn" style="color:var(--accent);border-color:rgba(56,189,248,.3)" onclick="openProjectFiles('${p.id}')">📂 Files</button>
+          ${canEdit ? `<button class="tbl-btn" style="color:var(--purple);border-color:rgba(167,139,250,.3)" onclick="openManageMembers('${p.id}')">👥 Members</button>` : ''}
+          ${isOwner ? `<button class="tbl-btn" style="color:var(--green);border-color:rgba(16,185,129,.3)" onclick="rotateProjectKeys('${p.id}')">🔄 Rotate</button>` : ''}
+          ${isOwner ? `<button class="tbl-btn" style="color:var(--red);border-color:rgba(248,113,113,.3)" onclick="confirmDeleteProject('${p.id}','${p.name.replace(/'/g,"'")}')">🗑 Delete</button>` : `<button class="tbl-btn" style="color:var(--muted);border-color:var(--border2)" onclick="leaveProject('${p.id}')">Leave</button>`}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Open project files modal ──────────────────────────────────────────────
+async function openProjectFiles(projectId) {
+  const proj = projectsCache.find(p => p.id === projectId);
+  if (!proj) return;
+
+  document.getElementById('modal-title').textContent = `📂 ${proj.name}`;
+  document.getElementById('modal-inner').classList.add('wide');
+  document.getElementById('modal-body').innerHTML = `<div style="color:var(--muted);font-size:12px;padding:10px 0">Loading files…</div>`;
+  const btn = document.getElementById('modal-confirm');
+  btn.textContent = 'Close'; btn.className = 'op-btn btn-neutral';
+  modalCallback = closeModal;
+  document.getElementById('modal').classList.add('open');
+
+  try {
+    const data = await loadProjectFiles(projectId);
+    const files = data.files || [];
+    if (!files.length) {
+      document.getElementById('modal-body').innerHTML = `
+        <div class="empty" style="padding:30px 0"><div class="empty-icon">📭</div><div class="empty-txt">No files in this project yet.<br><span style="font-size:10px">Encrypt a file and select this project.</span></div></div>`;
+      return;
+    }
+    const canEdit = proj.my_role === 'owner' || proj.my_role === 'editor';
+    const rows = files.map(f => {
+      const dlBtn = `<button class="tbl-btn" style="color:var(--green);border-color:rgba(52,211,153,.3)" onclick="downloadServerFile('${f.id}','${f.enc_name}')">⬇ Download</button>`;
+      const delBtn = canEdit ? `<button class="tbl-btn" style="color:var(--red);border-color:rgba(248,113,113,.3)" onclick="deleteServerFile('${f.id}',this)">✕</button>` : '';
+      return `<tr>
+        <td>${fileIcon(f.original_name)} ${f.original_name}</td>
+        <td style="color:var(--muted)">${fmtBytes(f.size)}</td>
+        <td style="color:var(--muted)">${f.encrypted_by}</td>
+        <td style="color:var(--muted)">${(f.time||'').replace('T',' ').slice(0,16)}</td>
+        <td style="color:var(--dim);font-size:10px">${f.download_count||0} dl</td>
+        <td><div class="tbl-actions">${dlBtn}${delBtn}</div></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('modal-body').innerHTML = `
+      <div style="overflow-x:auto">
+        <table style="font-size:12px">
+          <thead><tr><th>File</th><th>Size</th><th>Uploaded by</th><th>Date</th><th>Downloads</th><th>Actions</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    document.getElementById('modal-body').innerHTML = `<div style="color:var(--red);font-size:12px">Error loading files: ${e.message}</div>`;
+  }
+}
+
+async function downloadServerFile(fileId, encName) {
+  try {
+    const resp = await fetch(`${apiUrl}/files/${fileId}?username=${encodeURIComponent(currentUser.username)}`, {signal:AbortSignal.timeout(30000)});
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    const buf  = await resp.arrayBuffer();
+    const blob = new Blob([buf],{type:'application/octet-stream'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a'); a.href=url; a.download=encName; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+    toast(`Downloaded ${encName}`,'success');
+    await logAndChain('DOWNLOAD', encName, 'OK');
+  } catch(e) {
+    toast('Download failed: '+e.message,'error');
+  }
+}
+
+async function deleteServerFile(fileId, btn) {
+  if (!confirm('Delete this file from the server?')) return;
+  try {
+    const resp = await fetch(`${apiUrl}/files/${fileId}?username=${encodeURIComponent(currentUser.username)}`,{method:'DELETE',signal:AbortSignal.timeout(8000)});
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    btn.closest('tr').remove();
+    toast('File deleted from server.','info');
+    loadProjects(); // refresh counts
+  } catch(e) {
+    toast('Delete failed: '+e.message,'error');
+  }
+}
+
+// ── Manage members modal ──────────────────────────────────────────────────
+function openManageMembers(projectId) {
+  const proj = projectsCache.find(p => p.id === projectId);
+  if (!proj) return;
+  const isOwner = proj.my_role === 'owner';
+
+  const memberRows = (proj.members||[]).map(m => {
+    const removeBtn = isOwner && m.username !== currentUser.username
+      ? `<button class="tbl-btn" style="color:var(--red);border-color:rgba(248,113,113,.3);font-size:10px" onclick="doRemoveMember('${projectId}','${m.username}',this)">Remove</button>`
+      : '';
+    const roleOpts = ['viewer','editor','owner'].map(r =>
+      `<option value="${r}" ${m.role===r?'selected':''}>${r}</option>`
+    ).join('');
+    const roleSel = isOwner && m.username !== currentUser.username
+      ? `<select style="font-size:11px;padding:3px 6px;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--text)" onchange="doUpdateRole('${projectId}','${m.username}',this.value)">${roleOpts}</select>`
+      : `<span class="role-tag role-${m.role.toUpperCase()}">${m.role}</span>`;
+    return `<tr>
+      <td style="font-weight:600">${m.username}${m.username===currentUser.username?' <span style="color:var(--dim);font-size:10px">(you)</span>':''}</td>
+      <td>${roleSel}</td>
+      <td>${removeBtn}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('modal-title').textContent = `👥 Members — ${proj.name}`;
+  document.getElementById('modal-inner').classList.remove('wide');
+  document.getElementById('modal-body').innerHTML = `
+    <div style="overflow-x:auto;margin-bottom:16px">
+      <table style="font-size:12px;width:100%">
+        <thead><tr><th>Username</th><th>Role</th><th></th></tr></thead>
+        <tbody id="members-tbody">${memberRows}</tbody>
+      </table>
+    </div>
+    ${isOwner ? `
+    <div class="divider"></div>
+    <div class="card-label" style="margin-top:12px;margin-bottom:10px">Add teammate</div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="flex:1;min-width:140px;margin-bottom:0">
+        <label>Employee Name</label>
+        <input id="new-member-input" placeholder="Username" autocomplete="off">
+      </div>
+      <div class="field" style="flex:1;min-width:140px;margin-bottom:0">
+        <label>Employee ID</label>
+        <input id="new-member-id" placeholder="ID (e.g. DEV001)" autocomplete="off">
+      </div>
+      <div class="field" style="min-width:100px;margin-bottom:0">
+        <label>Role</label>
+        <select id="new-member-role">
+          <option value="viewer">viewer</option>
+          <option value="editor">editor</option>
+          <option value="owner">owner</option>
+        </select>
+      </div>
+      <button class="op-btn btn-action" onclick="doAddMember('${projectId}')">＋ Add</button>
+    </div>` : ''}
+  `;
+  const btn = document.getElementById('modal-confirm');
+  btn.textContent='Done'; btn.className='op-btn btn-neutral';
+  modalCallback=()=>{ closeModal(); loadProjects(); };
+  document.getElementById('modal').classList.add('open');
+}
+
+async function doAddMember(projectId) {
+  const username = document.getElementById('new-member-input')?.value?.trim();
+  const empId    = document.getElementById('new-member-id')?.value?.trim();
+  const role     = document.getElementById('new-member-role')?.value || 'viewer';
+  
+  if (!username || !empId) { toast('Please provide both Employee Name and ID.','error'); return; }
+  if (!userDB[username]) { toast(`User '${username}' not found in directory.`, 'error'); return; }
+  if (userDB[username].employeeId !== empId) { toast(`Employee ID mismatch for ${username}.`, 'error'); return; }
+
+  try {
+    await addMember(projectId, username, role);
+    toast(`Added ${username} as ${role}.`,'success');
+    await loadProjects();
+    openManageMembers(projectId); // refresh the modal
+  } catch(e) {
+    toast('Could not add member: '+e.message,'error');
+  }
+}
+
+async function doRemoveMember(projectId, username, btn) {
+  try {
+    await removeMember(projectId, username);
+    btn.closest('tr').remove();
+    toast(`Removed ${username}.`,'info');
+    loadProjects();
+  } catch(e) {
+    toast('Could not remove: '+e.message,'error');
+  }
+}
+
+// ── Rotate Project Keys ───────────────────────────────────────────────────
+async function rotateProjectKeys(projectId) {
+  if (!confirm('Rotate Project Keys?\n\nThis will re-encrypt all files in the project with a newly generated cryptographic master key. Are you sure you want to proceed?')) return;
+  try {
+    toast('Rotating project keys...', 'info');
+    const fd = new FormData();
+    fd.append('username', currentUser.username);
+    const resp = await fetch(`${apiUrl}/projects/${projectId}/rotate-keys`, {
+      method: 'POST',
+      body: fd
+    });
+    if (!resp.ok) {
+      const e = await resp.json();
+      throw new Error(e.detail || 'Failed to rotate keys');
+    }
+    const data = await resp.json();
+    toast(`Successfully rotated keys for ${data.rotated_files} files!`, 'success');
+  } catch(e) {
+    toast('Error rotating keys: ' + e.message, 'error');
+  }
+}
+
+async function doUpdateRole(projectId, username, newRole) {
+  try {
+    const resp = await fetch(`${apiUrl}/projects/${projectId}/members/${encodeURIComponent(username)}`, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username:currentUser.username,role:newRole}),
+      signal:AbortSignal.timeout(8000)
+    });
+    if (!resp.ok) { const e=await resp.json().catch(()=>({detail:'Error'})); throw new Error(e.detail); }
+    toast(`${username} is now ${newRole}.`,'success');
+    loadProjects();
+  } catch(e) {
+    toast('Could not update role: '+e.message,'error');
+  }
+}
+
+async function leaveProject(projectId) {
+  if (!confirm('Leave this project? You will lose access to its files.')) return;
+  try {
+    await removeMember(projectId, currentUser.username);
+    toast('Left project.','info');
+    loadProjects();
+  } catch(e) {
+    toast(e.message,'error');
+  }
+}
+
+// ── Share Personal File to Project Modal ─────────────────────────────────
+function openShareModal(serverFileId, registryId) {
+  const editable = projectsCache.filter(p => p.my_role === 'owner' || p.my_role === 'editor');
+  if (!editable.length) {
+    toast('You must create or join a project as an Editor/Owner first.','warn');
+    return;
+  }
+  
+  const opts = editable.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+  document.getElementById('modal-title').textContent = '🔗 Share File to Project';
+  document.getElementById('modal-inner').classList.remove('wide');
+  document.getElementById('modal-body').innerHTML = `
+    <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:15px">
+      Sharing this personal file to a project allows other members to decrypt it. The server will decrypt your personal file and re-encrypt it using the Project's Master Key.
+    </p>
+    <div class="field">
+      <label>Destination Project</label>
+      <select id="share-project-select">${opts}</select>
+    </div>`;
+    
+  const btn=document.getElementById('modal-confirm'); btn.textContent='Share File'; btn.className='op-btn btn-action'; btn.style.display='';
+  modalCallback=async()=>{
+    const selProjId = document.getElementById('share-project-select')?.value;
+    if (!selProjId) return;
+    closeModal();
+    try {
+      toast('Re-encrypting file on server...','info');
+      const resp = await apiShareToProject(serverFileId, selProjId);
+      toast('File successfully shared!','success');
+      
+      // Update local registry entry
+      const entry = fileRegistry.find(f => f.id === registryId);
+      if (entry) {
+        entry.projectId = selProjId;
+        if (resp.file && resp.file.enc_hash) {
+          entry.encHash = resp.file.enc_hash;
+        }
+        saveRegistry();
+        renderRegistry();
+      }
+      loadProjects();
+    } catch(e) {
+      toast('Failed to share: ' + e.message, 'error');
+    }
+  };
+  document.getElementById('modal').classList.add('open');
+}
+
+async function apiShareToProject(serverFileId, projectId) {
+  const form = new FormData();
+  form.append('project_id', projectId);
+  form.append('username', currentUser.username);
+  form.append('employee_id', currentUser.employeeId);
+  
+  const resp = await fetch(`${apiUrl}/files/${serverFileId}/share`, {
+    method:'POST',
+    body: form,
+    headers: {'X-Session-Token': hexArr(currentUser.sessionKey)},
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!resp.ok) { const e=await resp.json().catch(()=>({detail:'Error'})); throw new Error(e.detail); }
+  return resp.json();
+}
+
+
+function confirmDeleteProject(projectId, name) {
+  document.getElementById('modal-title').textContent = 'Delete Project';
+  document.getElementById('modal-inner').classList.remove('wide');
+  document.getElementById('modal-body').innerHTML = `<p style="font-size:13px;color:var(--muted);line-height:1.7">Delete <strong style="color:var(--text)">${name}</strong>? This permanently deletes all files stored in this project on the server.<br><br><strong style="color:var(--red)">This cannot be undone.</strong></p>`;
+  const btn=document.getElementById('modal-confirm'); btn.textContent='Delete Project'; btn.className='op-btn btn-danger';
+  modalCallback=async()=>{ closeModal(); try { await deleteProject(projectId); toast('Project deleted.','warn'); loadProjects(); } catch(e){ toast(e.message,'error'); } };
+  document.getElementById('modal').classList.add('open');
+}
+
+// ── Create project modal ──────────────────────────────────────────────────
+function openCreateProject() {
+  if (!apiOnline) { toast('Server required to create projects.','warn'); return; }
+  const colorBtns = PROJ_COLORS.map((c,i)=>
+    `<button type="button" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.style.outline='none');this.style.outline='2px solid white';document.getElementById('proj-color-input').value='${c}'" style="width:22px;height:22px;border-radius:50%;background:${c};border:none;cursor:pointer;${i===0?'outline:2px solid white':''}" title="${c}"></button>`
+  ).join('');
+
+  document.getElementById('modal-title').textContent = '＋ Create Project';
+  document.getElementById('modal-inner').classList.remove('wide');
+  document.getElementById('modal-body').innerHTML = `
+    <div class="field"><label>Project Name</label><input id="proj-name-input" placeholder="e.g. Q4 Reports, Client Files…" autocomplete="off"></div>
+    <div class="field"><label>Description <span style="color:var(--dim)">(optional)</span></label><input id="proj-desc-input" placeholder="What is this project for?"></div>
+    <div class="field">
+      <label>Color</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${colorBtns}</div>
+      <input type="hidden" id="proj-color-input" value="${PROJ_COLORS[0]}">
+    </div>`;
+  const btn=document.getElementById('modal-confirm'); btn.textContent='Create Project'; btn.className='op-btn btn-action';
+  modalCallback=async()=>{
+    const name=document.getElementById('proj-name-input')?.value?.trim();
+    const desc=document.getElementById('proj-desc-input')?.value?.trim()||'';
+    const color=document.getElementById('proj-color-input')?.value||PROJ_COLORS[0];
+    if (!name){ toast('Project name is required.','error'); return; }
+
+    try {
+      closeModal();
+      const proj = await createProject(name,desc,color);
+      toast(`Project "${name}" created!`,'success');
+
+      await loadProjects();
+      nav(document.querySelector('[data-panel="projects"]'));
+    } catch(e) { toast('Could not create project: '+e.message,'error'); }
+  };
+  document.getElementById('modal').classList.add('open');
+  setTimeout(()=>document.getElementById('proj-name-input')?.focus(),100);
+}
+
+// small helper so downloadServerFile can log locally without going through logAndChain
+function log_event_local(action, file, status) {
+  sessionLogs.push({time:new Date().toISOString(),user:currentUser.username,role:currentUser.role,action,file,status});
+}
+
+function initCompareCharts(){
+  if(chartsInitialized) return; chartsInitialized=true;
+  const PROJECTS=['SecureFS v2','VaultMan','VeraCrypt','age','Cryptomator'];
+  const COLORS=['#38bdf8','#f472b6','#34d399','#fbbf24','#a78bfa'];
+  const COLORS_A=['rgba(56,189,248,.15)','rgba(244,114,182,.15)','rgba(52,211,153,.15)','rgba(251,191,36,.15)','rgba(167,139,250,.15)'];
+  const GRID='rgba(30,45,66,.7)';
+  Chart.defaults.color='#64748b'; Chart.defaults.font.family="'DM Sans',sans-serif";
+
+  const RADAR_LABELS=['Encryption','Access Control','Audit Log','Blockchain','Usability','Deployment','Features'];
+  const RADAR_DATA={'SecureFS v2':[88,97,92,97,85,95,96],'VaultMan':[55,5,5,0,55,15,33],'VeraCrypt':[97,8,30,0,50,20,67],'age':[85,5,5,0,65,25,40],'Cryptomator':[83,5,10,0,88,35,57]};
+  new Chart(document.getElementById('cmpRadar'),{type:'radar',data:{labels:RADAR_LABELS,datasets:PROJECTS.map((p,i)=>({label:p,data:RADAR_DATA[p],borderColor:COLORS[i],backgroundColor:COLORS_A[i],borderWidth:p==='SecureFS v2'?2.5:1.2,pointBackgroundColor:COLORS[i],pointRadius:p==='SecureFS v2'?4:2}))},options:{scales:{r:{min:0,max:100,ticks:{stepSize:25,font:{size:8},backdropColor:'transparent',color:'#334155'},grid:{color:GRID},angleLines:{color:GRID},pointLabels:{font:{size:9.5},color:'#94a3b8'}}},plugins:{legend:{labels:{boxWidth:9,font:{size:10},color:'#64748b',padding:10}}},animation:{duration:1200}}});
+
+  const dims=['Encryption','Access Control','Audit Logging','Blockchain','Usability','Deployment','Features'];
+  const sfVal=RADAR_DATA['SecureFS v2'];
+  const cont=document.getElementById('cmp-score-bars');
+  dims.forEach((d,i)=>{
+    const best=Math.max(...PROJECTS.map(p=>RADAR_DATA[p][i]));
+    const isWinner=sfVal[i]===best;
+    cont.innerHTML+=`<div class="cmp-score-row"><span class="cmp-score-label">${d}</span><div class="cmp-score-track"><div class="cmp-score-bar" style="width:${sfVal[i]}%;background:${isWinner?'#38bdf8':'#2d3f56'}"></div></div><span class="cmp-score-val">${sfVal[i]}</span>${isWinner?'<span class="cmp-winner">★ Best</span>':''}</div>`;
+  });
+
+  const SEC_CRITERIA=['Cipher','Key Deriv.','AAD','IDS','Blockchain'];
+  const SEC_DATA={'SecureFS v2':[28,18,20,14,14],'VaultMan':[16,14,0,4,0],'VeraCrypt':[30,20,0,10,0],'age':[26,16,0,6,0],'Cryptomator':[24,18,0,8,0]};
+  const SEC_COLORS=['rgba(56,189,248,.75)','rgba(52,211,153,.75)','rgba(251,191,36,.75)','rgba(167,139,250,.75)','rgba(251,146,60,.75)'];
+  new Chart(document.getElementById('cmpSecStack'),{type:'bar',data:{labels:PROJECTS,datasets:SEC_CRITERIA.map((c,i)=>({label:c,data:PROJECTS.map(p=>SEC_DATA[p][i]),backgroundColor:SEC_COLORS[i],borderRadius:i===SEC_CRITERIA.length-1?4:0}))},options:{scales:{x:{stacked:true,grid:{color:GRID},ticks:{font:{size:10}}},y:{stacked:true,grid:{color:GRID},ticks:{font:{size:9}},title:{display:true,text:'Score',color:'#64748b',font:{size:9}}}},plugins:{legend:{labels:{boxWidth:9,font:{size:10},padding:8}}},animation:{duration:1100}}});
+
+  const FEAT={'SecureFS v2':16,'VaultMan':4,'VeraCrypt':7,'age':5,'Cryptomator':8};
+  new Chart(document.getElementById('cmpFeatureBar'),{type:'bar',data:{labels:PROJECTS,datasets:[{label:'Features implemented (of 17)',data:PROJECTS.map(p=>FEAT[p]),backgroundColor:COLORS_A,borderColor:COLORS,borderWidth:1.5,borderRadius:5}]},options:{indexAxis:'y',scales:{x:{grid:{color:GRID},max:17,ticks:{font:{size:9}},title:{display:true,text:'of 17 features',color:'#64748b',font:{size:9}}},y:{grid:{color:'transparent'},ticks:{font:{size:11},color:'#94a3b8'}}},plugins:{legend:{display:false}},animation:{duration:1100}}});
+
+  const BUBBLE={'SecureFS v2':{x:38,y:96,r:22},'VaultMan':{x:15,y:27,r:11},'VeraCrypt':{x:92,y:67,r:10},'age':{x:20,y:33,r:13},'Cryptomator':{x:85,y:53,r:18}};
+  new Chart(document.getElementById('cmpBubble'),{type:'bubble',data:{datasets:PROJECTS.map((p,i)=>({label:p,data:[{x:BUBBLE[p].x,y:BUBBLE[p].y,r:BUBBLE[p].r}],backgroundColor:COLORS_A[i],borderColor:COLORS[i],borderWidth:p==='SecureFS v2'?2.5:1.5}))},options:{scales:{x:{title:{display:true,text:'Complexity →',color:'#64748b',font:{size:9}},grid:{color:GRID},min:0,max:110},y:{title:{display:true,text:'Features (%) →',color:'#64748b',font:{size:9}},grid:{color:GRID},min:0,max:110}},plugins:{legend:{labels:{boxWidth:9,font:{size:10},padding:8}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: Complexity ${ctx.raw.x}, Features ${ctx.raw.y}%`}}},animation:{duration:1200}}});
+
+  new Chart(document.getElementById('cmpUnique'),{type:'doughnut',data:{labels:['Blockchain Ledger','Identity AAD','RBAC 6 roles','IDS Lockout','File Registry'],datasets:[{data:[28,22,20,18,12],backgroundColor:['#fb923c','#38bdf8','#60a5fa','#818cf8','#a78bfa'],borderColor:'#0d1117',borderWidth:3,hoverOffset:7}]},options:{cutout:'60%',plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:10},padding:10}}},animation:{animateRotate:true,duration:1300}}});
+}
+
+// Hook nav for compare
+(function(){
+  const _orig=nav;
+  nav=function(el){
+    _orig(el);
+    if(el&&el.dataset.panel==='compare') setTimeout(initCompareCharts,80);
+  };
+})();
+
+// AMBIENT GLOW
+document.addEventListener('mousemove', (e) => {
+  const glow = document.getElementById('cursor-glow');
+  if (glow) {
+    glow.style.opacity = '1';
+    glow.style.left = e.clientX + 'px';
+    glow.style.top = e.clientY + 'px';
+  }
+});
+document.addEventListener('mouseleave', () => {
+  const glow = document.getElementById('cursor-glow');
+  if (glow) glow.style.opacity = '0';
+});
+
+// TERMINAL LOGIC
+let terminalHistory = [];
+let terminalHistoryIdx = -1;
+
+function toggleTerminal() {
+  const t = document.getElementById('terminal-overlay');
+  if (t.classList.contains('open')) {
+    t.classList.remove('open');
+  } else {
+    t.classList.add('open');
+    document.getElementById('terminal-input').focus();
+    document.getElementById('terminal-prompt').textContent = (currentUser?.username || 'guest') + '@securefs:~#';
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === '`' && e.ctrlKey) {
+    e.preventDefault();
+    toggleTerminal();
+  }
+  if (e.key === 'Escape') {
+    document.getElementById('terminal-overlay').classList.remove('open');
+  }
+});
+
+document.getElementById('terminal-input').addEventListener('keydown', e => {
+  const input = e.target;
+  if (e.key === 'Enter') {
+    const cmd = input.value.trim();
+    if (!cmd) return;
+    printTerm(`<span class="term-cmd">${document.getElementById('terminal-prompt').textContent} ${cmd}</span>`);
+    terminalHistory.push(cmd);
+    terminalHistoryIdx = terminalHistory.length;
+    input.value = '';
+    processCommand(cmd);
+  } else if (e.key === 'ArrowUp') {
+    if (terminalHistoryIdx > 0) {
+      terminalHistoryIdx--;
+      input.value = terminalHistory[terminalHistoryIdx];
+    }
+  } else if (e.key === 'ArrowDown') {
+    if (terminalHistoryIdx < terminalHistory.length - 1) {
+      terminalHistoryIdx++;
+      input.value = terminalHistory[terminalHistoryIdx];
+    } else {
+      terminalHistoryIdx = terminalHistory.length;
+      input.value = '';
+    }
+  }
+});
+
+function printTerm(html) {
+  const out = document.getElementById('terminal-output');
+  out.innerHTML += `<div>${html}</div>`;
+  out.scrollTop = out.scrollHeight;
+}
+
+async function processCommand(cmdStr) {
+  const args = cmdStr.split(' ').filter(s=>s);
+  const cmd = args[0].toLowerCase();
+  
+  try {
+    if (cmd === 'help') {
+      printTerm(`Commands:
+      help                - Show this menu
+      clear               - Clear terminal
+      whoami              - Show current user info
+      projects            - List all available projects
+      users               - List all users
+      logs                - Show last 10 audit logs
+      exit                - Close terminal
+      `);
+    } else if (cmd === 'clear') {
+      document.getElementById('terminal-output').innerHTML = '';
+    } else if (cmd === 'whoami') {
+      if (!currentUser) printTerm('Not logged in.');
+      else printTerm(`User: <span class="term-succ">${currentUser.username}</span> | ID: ${currentUser.employeeId} | Role: ${currentUser.role}`);
+    } else if (cmd === 'projects') {
+      if (!projectsCache.length && apiOnline) await loadProjects();
+      if (!projectsCache.length) { printTerm('No projects found.'); return; }
+      projectsCache.forEach(p => printTerm(`- ${p.name} (Role: ${p.my_role})`));
+    } else if (cmd === 'users') {
+      if (!apiOnline) { printTerm('Server offline.'); return; }
+      const resp = await fetch(`${apiUrl}/users`);
+      if(!resp.ok) throw new Error('Failed to fetch users');
+      const data = await resp.json();
+      Object.values(data.users).forEach(u => printTerm(`- ${u.username} (${u.role})`));
+    } else if (cmd === 'logs') {
+      const logs = [...blockchain].slice(-10);
+      logs.forEach(b => printTerm(`[${b.index}] ${b.data?.action} by ${b.data?.user || 'system'}`));
+    } else if (cmd === 'exit') {
+      toggleTerminal();
+    } else {
+      printTerm(`<span class="term-err">Command not found: ${cmd}</span>`);
+    }
+  } catch(e) {
+    printTerm(`<span class="term-err">Error: ${e.message}</span>`);
+  }
+}
+
+// --- WEBAUTHN BIOMETRICS ---
+function base64urlToBuffer(base64url) {
+  const padding = '='.repeat((4 - base64url.length % 4) % 4);
+  const base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const buffer = new Uint8Array(rawData.length);
+  for(let i = 0; i < rawData.length; ++i) {
+    buffer[i] = rawData.charCodeAt(i);
+  }
+  return buffer.buffer;
+}
+
+function bufferToBase64url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let str = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    str += String.fromCharCode(bytes[i]);
+  }
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function registerWebAuthn() {
+  if (!useServer) return toast('Server connection required for biometrics.', 'error');
+  if (!currentUser) return toast('Please log in first.', 'error');
+  if (!navigator.credentials) return toast('Biometrics require a secure context (HTTPS or localhost).', 'error');
+
+  try {
+    const res = await fetch(`${apiUrl}/webauthn/register/generate-options`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Session-Token': currentUser.sessionKey},
+      body: JSON.stringify({username: currentUser.username})
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.detail || 'Failed to fetch options');
+    const options = data;
+    
+    options.challenge = base64urlToBuffer(options.challenge);
+    options.user.id = base64urlToBuffer(options.user.id);
+    if (options.excludeCredentials) {
+      options.excludeCredentials.forEach(c => c.id = base64urlToBuffer(c.id));
+    }
+    
+    const credential = await navigator.credentials.create({ publicKey: options });
+    
+    const credentialData = {
+      id: credential.id,
+      rawId: bufferToBase64url(credential.rawId),
+      type: credential.type,
+      response: {
+        attestationObject: bufferToBase64url(credential.response.attestationObject),
+        clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+      }
+    };
+    
+    const verifyRes = await fetch(`${apiUrl}/webauthn/register/verify`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Session-Token': currentUser.sessionKey},
+      body: JSON.stringify({username: currentUser.username, credential: credentialData})
+    });
+    
+    const vData = await verifyRes.json();
+    if(verifyRes.ok) toast("Biometric registered successfully!", "success");
+    else throw new Error(vData.detail || 'Verification failed');
+  } catch(e) {
+    console.error(e);
+    toast("Biometric registration failed: " + e.message, "error");
+  }
+}
+
+async function loginWebAuthn() {
+  const username = document.getElementById("login-user").value;
+  if(!username) return toast("Please enter your username first", "error");
+  if (!navigator.credentials) return toast('Biometrics require a secure context (HTTPS or localhost).', 'error');
+  
+  const originalApiOnline = apiOnline;
+  if (!originalApiOnline) await pingApi();
+  if (!apiOnline) return toast('Cannot reach server.', 'error');
+  
+  try {
+    const res = await fetch(`${apiUrl}/webauthn/login/generate-options`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username})
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.detail || 'Failed to fetch login options');
+    const options = data;
+    
+    options.challenge = base64urlToBuffer(options.challenge);
+    if(options.allowCredentials) {
+      options.allowCredentials.forEach(c => c.id = base64urlToBuffer(c.id));
+    }
+    
+    const credential = await navigator.credentials.get({ publicKey: options });
+    
+    const credentialData = {
+      id: credential.id,
+      rawId: bufferToBase64url(credential.rawId),
+      type: credential.type,
+      response: {
+        authenticatorData: bufferToBase64url(credential.response.authenticatorData),
+        clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+        signature: bufferToBase64url(credential.response.signature),
+        userHandle: credential.response.userHandle ? bufferToBase64url(credential.response.userHandle) : null
+      }
+    };
+    
+    const verifyRes = await fetch(`${apiUrl}/webauthn/login/verify`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username, credential: credentialData})
+    });
+    
+    const vData = await verifyRes.json();
+    if(!verifyRes.ok) throw new Error(vData.detail || 'Biometric login failed');
+    const result = vData;
+    
+    currentUser = {
+      username: username,
+      employeeId: result.employee_id,
+      role: result.role,
+      sessionKey: result.session_key
+    };
+    
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("landing-screen").style.display = "none";
+    document.getElementById("app-screen").style.display = "flex";
+    loadProjects();
+    document.getElementById("current-user-disp").textContent = currentUser.username;
+    document.getElementById("current-role-disp").textContent = currentUser.role;
+    if (hasPerm('view_logs')) document.getElementById('compliance-btn').style.display = 'block';
+    toast(`Welcome back, ${currentUser.username}`, "success");
+    
+  } catch(e) {
+    console.error(e);
+    toast("Biometric login failed: " + e.message, "error");
+  }
+}
+
+// --- FORENSIC WATERMARKING ---
+async function applyWatermark(blob, filename) {
+  const mime = blob.type;
+  if (!mime.startsWith('image/')) return blob;
+  
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      
+      const text = `FORENSIC: ${currentUser.username} | ${currentUser.employeeId}`;
+      const fontSize = Math.max(10, Math.floor(canvas.width / 60));
+      ctx.font = `${fontSize}px Inter, sans-serif`;
+      
+      // Bottom strip (Subtle)
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(0, canvas.height - fontSize - 10, canvas.width, fontSize + 10);
+      
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.textAlign = 'right';
+      ctx.fillText(text, canvas.width - 15, canvas.height - 8);
+      
+      // Diagonal Watermark (Very Subtle)
+      ctx.save();
+      ctx.translate(canvas.width/2, canvas.height/2);
+      ctx.rotate(-25 * Math.PI / 180);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.font = `${fontSize * 0.8}px Inter`;
+      ctx.textAlign = 'center';
+      for (let i = -canvas.width; i < canvas.width; i += 250) {
+        for (let j = -canvas.height; j < canvas.height; j += 120) {
+          ctx.fillText(`SFS FORENSIC - ${currentUser.username}`, i, j);
+        }
+      }
+      ctx.restore();
+      
+      canvas.toBlob((newBlob) => {
+        URL.revokeObjectURL(img.src);
+        resolve(newBlob || blob);
+      }, mime);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      resolve(blob);
+    };
+    img.src = URL.createObjectURL(blob);
+  });
+}
+
+// --- COMPLIANCE REPORTING ---
+async function generateComplianceReport() {
+  if (!hasPerm('view_logs')) return;
+  toast('Generating Compliance Report...','info');
+  try {
+    const res = await fetch(`${apiUrl}/admin/compliance-report?username=${currentUser.username}`, {
+      headers: { 'X-Session-Token': currentUser.sessionKey }
+    });
+    if (!res.ok) throw new Error('Report generation failed');
+    const data = await res.json();
+    
+    // Create a beautiful report summary
+    const reportHtml = `
+      <div style="font-family:Inter,sans-serif; color:#eee; padding:20px;">
+        <h2 style="color:var(--accent)">SOC2 / GDPR Compliance Audit</h2>
+        <div style="margin:20px 0; padding:15px; background:rgba(255,255,255,0.05); border-radius:8px;">
+          <div class="r-row"><span class="r-k">Generated At</span><span class="r-v">${data.generated_at}</span></div>
+          <div class="r-row"><span class="r-k">Blockchain Integrity</span><span class="r-v ${data.integrity_check==='OK'?'r-ok':'r-fail'}">${data.integrity_check}</span></div>
+          <div class="r-row"><span class="r-k">Total Audit Events</span><span class="r-v">${data.total_events}</span></div>
+          <div class="r-row"><span class="r-k">Blockchain Depth</span><span class="r-v">${data.blockchain_depth} blocks</span></div>
+        </div>
+        
+        <h3 style="margin-top:20px;">Activity Distribution</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          ${Object.entries(data.action_distribution).map(([k,v])=>`<div class="r-row"><span class="r-k">${k}</span><span class="r-v">${v}</span></div>`).join('')}
+        </div>
+
+        <h3 style="margin-top:20px; color:var(--red);">Recent Failures / High Risk</h3>
+        ${data.high_risk_events.length ? data.high_risk_events.map(e=>`
+          <div style="font-size:11px; margin-top:5px; color:var(--muted)">[${e.time}] ${e.user}: ${e.action} -> ${e.status}</div>
+        `).join('') : '<div style="color:var(--green)">No high-risk events found.</div>'}
+      </div>
+    `;
+    
+    showModal('Compliance Audit Result', reportHtml);
+    
+    // Also offer JSON download
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=`SFS_Compliance_${Date.now()}.json`;
+    a.style.display='block'; a.style.marginTop='20px'; a.className='dl-link'; a.textContent='⬇ Download Full JSON Report';
+    document.querySelector('.modal-content').appendChild(a);
+    
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+// --- DESKTOP NATIVE BRIDGE ---
+window.addEventListener('pywebviewready', function() {
+  isDesktop = true;
+  document.body.classList.add('desktop-mode');
+  
+  // Call Python to get status
+  window.pywebview.api.get_status().then(status => {
+    console.log('Desktop Native Status:', status);
+    toast('SecureFS Desktop Bridge Active: ' + status.version, 'success');
+  });
+});
+
+function nativeMinimize() {
+  if (isDesktop) window.pywebview.api.minimize();
+}
+
+function nativeFullscreen() {
+  if (isDesktop) window.pywebview.api.toggle_fullscreen();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+build/*
+dist/*
+*.spec
+*.pyc
+*.pyo
+*.pyd
+*.zip
+*.egg
+*.log
+__pycache__
