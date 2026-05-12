@@ -62,19 +62,45 @@ _DB_DEFAULTS = {
     "users":       {},
 }
 
+import threading
+
+db_lock = threading.Lock()
+
 def load_db() -> dict:
-    if DB_PATH.exists():
-        try:
-            data = json.loads(DB_PATH.read_text())
-            for k, v in _DB_DEFAULTS.items():
-                data.setdefault(k, v)
-            return data
-        except Exception:
-            pass
-    return {k: (v.copy() if isinstance(v, dict) else list(v)) for k, v in _DB_DEFAULTS.items()}
+    with db_lock:
+        if DB_PATH.exists():
+            for _ in range(5):  # Retry up to 5 times for Windows file locks
+                try:
+                    content = DB_PATH.read_text(encoding="utf-8").strip()
+                    if not content:
+                        time.sleep(0.1)
+                        continue
+                    data = json.loads(content)
+                    for k, v in _DB_DEFAULTS.items():
+                        data.setdefault(k, v)
+                    return data
+                except (json.JSONDecodeError, IOError):
+                    time.sleep(0.1)
+            # If we're here, the file exists but we can't read it properly.
+            # Don't return defaults, or we'll wipe the DB on next save.
+            print("CRITICAL: Could not read DB file properly. Retrying...")
+        
+        # Fallback to defaults only if file doesn't exist at all
+        return {k: (v.copy() if isinstance(v, dict) else list(v)) for k, v in _DB_DEFAULTS.items()}
 
 def save_db(db: dict):
-    DB_PATH.write_text(json.dumps(db, indent=2))
+    with db_lock:
+        # Atomic write: write to .tmp then rename
+        tmp_path = DB_PATH.with_suffix(".tmp")
+        try:
+            tmp_path.write_text(json.dumps(db, indent=2), encoding="utf-8")
+            if DB_PATH.exists():
+                DB_PATH.unlink()
+            tmp_path.rename(DB_PATH)
+        except Exception as e:
+            print(f"ERROR saving DB: {e}")
+            if tmp_path.exists():
+                tmp_path.unlink()
 
 # ── App ──────────────────────────────────────────────────────────────────────
 app = FastAPI(title="SecureFS v2 Backend", version=VERSION)
