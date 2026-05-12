@@ -3741,7 +3741,7 @@ const bgEngine = new (class {
     this.canvas = null; this.ctx = null;
     this.mode = 'network'; 
     this.w = 0; this.h = 0;
-    this.particles = []; this.lightning = [];
+    this.particles = [];
   }
 
   init() {
@@ -3764,67 +3764,61 @@ const bgEngine = new (class {
 
   initNetwork() {
     this.particles = [];
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 90; i++) {
       this.particles.push({
         x: Math.random() * this.w,
         y: Math.random() * this.h,
-        vx: (Math.random() - 0.5) * 0.9,
-        vy: (Math.random() - 0.5) * 0.9,
-        radius: Math.random() * 1.5 + 0.5,
-        flash: 0
+        vx: (Math.random() - 0.5) * 0.22, // Very slow
+        vy: (Math.random() - 0.5) * 0.22,
+        radius: Math.random() * 1.2 + 0.6,
+        phase: Math.random() * Math.PI * 2 // For individual fading
       });
     }
-  }
-
-  triggerLightning() {
-    const x = Math.random() * this.w;
-    const y = Math.random() * this.h;
-    const path = [{x, y}];
-    for (let i = 0; i < 8; i++) {
-      path.push({
-        x: path[i].x + (Math.random() - 0.5) * 160,
-        y: path[i].y + Math.random() * 110
-      });
-    }
-    this.lightning.push({path, life: 1});
   }
 
   animate() {
     if (!this.ctx) return;
     this.ctx.clearRect(0, 0, this.w, this.h);
-    const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.001);
-    this.drawNetwork(pulse);
+    // Slow global pulse
+    const globalFade = 0.7 + 0.3 * Math.sin(Date.now() * 0.0006);
+    this.drawNetwork(globalFade);
     requestAnimationFrame(() => this.animate());
   }
 
-  drawNetwork(pulse) {
+  drawNetwork(globalFade) {
     const ctx = this.ctx;
-    if (Math.random() < 0.006) this.triggerLightning();
+    const now = Date.now();
+    
+    // Draw dots
     this.particles.forEach(p => {
       p.x += p.vx; p.y += p.vy;
       if (p.x < 0 || p.x > this.w) p.vx *= -1;
       if (p.y < 0 || p.y > this.h) p.vy *= -1;
-      if (p.flash > 0) p.flash -= 0.02;
-      ctx.beginPath(); ctx.arc(p.x, p.y, (p.radius + p.flash * 2.5) * pulse, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(56, 189, 248, ${(0.45 + p.flash) * pulse})`; ctx.fill();
+      
+      const pFade = (0.4 + 0.3 * Math.sin(now * 0.001 + p.phase)) * globalFade;
+      ctx.beginPath(); 
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${pFade})`; 
+      ctx.fill();
     });
+    
+    // Draw subtle connecting lines
     for (let i = 0; i < this.particles.length; i++) {
       for (let j = i + 1; j < this.particles.length; j++) {
         const p1 = this.particles[i], p2 = this.particles[j];
         const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
-        if (d < 190) {
-          ctx.beginPath(); ctx.strokeStyle = `rgba(56, 189, 248, ${0.14 * (1 - d/190) * pulse})`;
-          ctx.lineWidth = 0.5; ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        
+        if (d < 200) {
+          const lineFade = (1 - d/200) * 0.12 * globalFade;
+          ctx.beginPath(); 
+          ctx.strokeStyle = `rgba(255, 255, 255, ${lineFade})`;
+          ctx.lineWidth = 0.5; 
+          ctx.moveTo(p1.x, p1.y); 
+          ctx.lineTo(p2.x, p2.y); 
+          ctx.stroke();
         }
       }
     }
-    this.lightning = this.lightning.filter(l => {
-      l.life -= 0.035;
-      ctx.beginPath(); ctx.strokeStyle = `rgba(56, 189, 248, ${l.life * 0.7})`;
-      ctx.lineWidth = 2.5 * l.life; ctx.shadowBlur = 20 * l.life; ctx.shadowColor = '#38bdf8';
-      l.path.forEach((p, idx) => { if (idx === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); p.flash = l.life; });
-      ctx.stroke(); ctx.shadowBlur = 0; return l.life > 0;
-    });
   }
 })();
 
