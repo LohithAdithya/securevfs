@@ -802,6 +802,7 @@ canvas{width:100%!important}
 
       <div class="sidebar-section-label">Team</div>
       <div class="nav-item" data-panel="projects" onclick="nav(this)"><span class="nav-icon">📁</span>Projects <span class="nav-badge" id="proj-badge">0</span></div>
+      <div class="nav-item" data-panel="team-mgmt" id="nav-team-mgmt" style="display:none" onclick="openTeamManagement()"><span class="nav-icon">🤝</span>Team Management</div>
 
       <div class="sidebar-section-label" id="sec-mgmt-label" style="display:none">Management</div>
       <div class="nav-item" data-panel="logs" id="nav-logs" style="display:none" onclick="nav(this)"><span class="nav-icon">📋</span>Access Logs</div>
@@ -2181,15 +2182,15 @@ function doDelete(name){
 
 // FILE REGISTRY
 // FILE REGISTRY
+// FILE REGISTRY
 async function renderRegistry(){
   const el = document.getElementById('registry-content');
   let mergedFiles = [...fileRegistry];
   let serverFiles = [];
   
   if (apiOnline) {
-    const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'DEVELOPER';
     try {
-      const resp = await fetch(`${apiUrl}/files?username=${encodeURIComponent(currentUser.username)}&is_admin=${isAdmin}`, {signal:AbortSignal.timeout(8000)});
+      const resp = await fetch(`${apiUrl}/files?username=${encodeURIComponent(currentUser.username)}&role=${currentUser.role}`, {signal:AbortSignal.timeout(8000)});
       if (resp.ok) {
         const data = await resp.json();
         serverFiles = data.files || [];
@@ -2244,21 +2245,11 @@ async function renderRegistry(){
     // ACTIONS
     let actions = [];
     if (canDownload) {
-      if (!isOwner && isAdmin) {
-        if (hasServer) {
-          actions.push(`<button class="tbl-btn" onclick="redownloadFile('${f.id}')" title="Encrypted">Encrypted</button>`);
-          actions.push(`<button class="tbl-btn" style="color:var(--orange);border-color:var(--orange-dim)" onclick="adminDecryptFile('${f.serverFileId}','${f.name}')">🔓 Admin Decrypt</button>`);
-        } else if (inMemory) {
-          actions.push(`<button class="tbl-btn" style="color:var(--orange);border-color:var(--orange-dim)" onclick="adminDecryptLocalFile('${f.id}','${f.encryptedBy}','${f.name}')">🔓 Admin Decrypt</button>`);
-        }
-      } else {
-        actions.push(`<button class="tbl-btn" onclick="redownloadFile('${f.id}')" title="Encrypted">Encrypted</button>`);
-        actions.push(`<button class="tbl-btn" style="color:var(--green);border-color:var(--green-dim)" onclick="quickDecrypt('${f.id}','${f.name}')">🔓 Decrypted</button>`);
-      }
+      actions.push(`<button class="tbl-btn" style="color:var(--accent);border-color:var(--accent-dim)" onclick="openDownloadOptions('${f.id}')">⬇ Download</button>`);
     }
     
-    if (hasServer && !f.projectId && isOwner) {
-      actions.push(`<button class="tbl-btn" style="color:var(--accent);border-color:var(--accent-dim)" onclick="openShareModal('${f.serverFileId}', '${f.id}')">🔗 Share</button>`);
+    if (hasServer && !f.projectId && (isOwner || isAdmin)) {
+      actions.push(`<button class="tbl-btn" style="color:var(--green);border-color:var(--green-dim)" onclick="openShareModal('${f.serverFileId}', '${f.id}')">🔗 Share</button>`);
     }
     
     if (isOwner || isAdmin) {
@@ -2305,6 +2296,135 @@ async function renderRegistry(){
     </div>
   `;
   window._currentRegistryView = mergedFiles;
+}
+
+function openDownloadOptions(localId) {
+  const f = window._currentRegistryView.find(x => x.id === localId);
+  if (!f) return;
+  
+  const inMemory = encryptedBlobStore.has(f.id);
+  const hasServer = !!(f.serverFileId && apiOnline);
+  const isOwner = f.encryptedBy === currentUser.username;
+  const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'DEVELOPER';
+
+  document.getElementById('modal-title').textContent = 'Download Options';
+  document.getElementById('modal-inner').classList.remove('wide');
+  document.getElementById('modal-body').innerHTML = `
+    <div style="padding:10px 0; display:flex; flex-direction:column; gap:16px">
+      <div style="background:var(--surface2); padding:16px; border-radius:12px; border:1px solid var(--border)">
+        <h4 style="margin-bottom:8px; color:var(--text)">Format: Encrypted (Raw)</h4>
+        <p style="font-size:12px; color:var(--muted); margin-bottom:12px">Download the secured ciphertext. Requires this app to access later.</p>
+        <button class="btn-primary" style="width:100%; font-size:14px" onclick="closeModal(); redownloadFile('${f.id}')">Download .enc</button>
+      </div>
+      <div style="background:var(--surface2); padding:16px; border-radius:12px; border:1px solid var(--border)">
+        <h4 style="margin-bottom:8px; color:var(--text)">Format: Decrypted (Access)</h4>
+        <p style="font-size:12px; color:var(--muted); margin-bottom:12px">Access the original file content immediately.</p>
+        <button class="op-btn btn-encrypt" style="width:100%; justify-content:center" id="btn-dl-dec">Unlock & Save</button>
+      </div>
+    </div>
+  `;
+  
+  const dlDec = document.getElementById('btn-dl-dec');
+  dlDec.onclick = () => {
+    closeModal();
+    if (!isOwner && isAdmin) {
+      if (hasServer) adminDecryptFile(f.serverFileId, f.name);
+      else if (inMemory) adminDecryptLocalFile(f.id, f.encryptedBy, f.name);
+    } else {
+      quickDecrypt(f.id, f.name);
+    }
+  };
+  
+  document.getElementById('modal-confirm').style.display = 'none';
+  document.getElementById('modal').classList.add('open');
+}
+
+async function openTeamManagement() {
+  toast('Loading team data...', 'info');
+  try {
+    const [allUsersResp, myTeamResp] = await Promise.all([
+      fetch(`${apiUrl}/users`),
+      fetch(`${apiUrl}/teams/${encodeURIComponent(currentUser.username)}`)
+    ]);
+    
+    if (!allUsersResp.ok) throw new Error('Failed to load users');
+    const allUsers = await allUsersResp.json();
+    const myTeam = (await myTeamResp.json()).team || [];
+    
+    // Managers can only add people with LOWER clearance than them
+    const validTeamMembers = allUsers.users.filter(u => 
+      u.username !== currentUser.username && 
+      !['MANAGER', 'ADMIN', 'DEVELOPER'].includes(u.role)
+    );
+
+    document.getElementById('modal-title').textContent = 'Team Management';
+    document.getElementById('modal-inner').classList.add('wide');
+    document.getElementById('modal-body').innerHTML = `
+      <div class="info-box">
+        <span class="info-box-icon">🤝</span>
+        <span>Define your operational team. You will be able to view and oversee the file activities of these members. <strong>Higher clearance roles are excluded for security.</strong></span>
+      </div>
+      <div style="max-height:400px; overflow-y:auto; border:1px solid var(--border); border-radius:12px; background:var(--bg)">
+        <table style="width:100%">
+          <thead>
+            <tr>
+              <th style="width:40px"></th>
+              <th>Username</th>
+              <th>Role</th>
+              <th>Employee ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${validTeamMembers.map(u => `
+              <tr style="cursor:pointer" onclick="toggleTeamCheck('${u.username}')">
+                <td><input type="checkbox" class="team-check" id="team-cb-${u.username}" value="${u.username}" ${myTeam.includes(u.username) ? 'checked' : ''} style="width:18px;height:18px"></td>
+                <td style="font-weight:600">${u.username}</td>
+                <td><span class="role-tag role-${u.role}">${u.role}</span></td>
+                <td style="color:var(--muted)">${u.employeeId || 'N/A'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    
+    const confirm = document.getElementById('modal-confirm');
+    confirm.textContent = 'Save Team';
+    confirm.className = 'op-btn btn-encrypt';
+    confirm.style.display = 'inline-flex';
+    modalCallback = async () => {
+      const selected = Array.from(document.querySelectorAll('.team-check:checked')).map(i => i.value);
+      await saveTeam(selected);
+      closeModal();
+    };
+    
+    document.getElementById('modal').classList.add('open');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+function toggleTeamCheck(user) {
+  const cb = document.getElementById(`team-cb-${user}`);
+  if (cb) cb.checked = !cb.checked;
+}
+
+async function saveTeam(team) {
+  try {
+    const resp = await fetch(`${apiUrl}/teams/${encodeURIComponent(currentUser.username)}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({team})
+    });
+    if (resp.ok) {
+      toast('Team updated successfully', 'success');
+      renderRegistry(); // Refresh view to see new team files
+    } else {
+      toast('Failed to save team', 'error');
+    }
+  } catch(e) {
+    toast('Network error saving team', 'error');
+  }
 }
 
 function openShareModal(serverFileId, localId) {

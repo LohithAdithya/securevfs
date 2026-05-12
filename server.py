@@ -60,6 +60,7 @@ _DB_DEFAULTS = {
     "files":       {},
     "audit":       [],
     "users":       {},
+    "teams":       {},
 }
 
 import threading
