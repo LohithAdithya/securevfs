@@ -2180,9 +2180,9 @@ function doDelete(name){
 }
 
 // FILE REGISTRY
+// FILE REGISTRY
 async function renderRegistry(){
-  const el=document.getElementById('registry-content');
-  
+  const el = document.getElementById('registry-content');
   let mergedFiles = [...fileRegistry];
   let serverFiles = [];
   
@@ -2223,80 +2223,143 @@ async function renderRegistry(){
     }
   }
 
-  document.getElementById('reg-badge').textContent=mergedFiles.length;
+  document.getElementById('reg-badge').textContent = mergedFiles.length;
   if (!mergedFiles.length){ el.innerHTML='<div class="empty"><div class="empty-icon">🗂</div><div class="empty-txt">No files in history.</div></div>'; return; }
   
   const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'DEVELOPER';
-
-  el.innerHTML=mergedFiles.sort((a,b)=>a.time < b.time ? 1 : -1).map(f=>{
-    const inMemory=encryptedBlobStore.has(f.id);
-    const hasServer=!!(f.serverFileId && apiOnline);
-    const canDownload=inMemory||hasServer;
+  
+  const rows = mergedFiles.sort((a,b)=>a.time < b.time ? 1 : -1).map(f=>{
+    const inMemory = encryptedBlobStore.has(f.id);
+    const hasServer = !!(f.serverFileId && apiOnline);
+    const canDownload = inMemory || hasServer;
     const isOwner = f.encryptedBy === currentUser.username;
-    const canShare = hasServer && !f.projectId && isOwner;
     
+    // SOURCE TAG
     const sourceTag = inMemory
-      ? `<span style="font-size:9px;padding:2px 6px;border-radius:100px;background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.2)" title="Cached in browser">💾 Local</span>`
+      ? `<span class="badge-active" style="background:var(--green-dim);color:var(--green)">Local</span>`
       : hasServer
-        ? `<span style="font-size:9px;padding:2px 6px;border-radius:100px;background:rgba(56,189,248,.1);color:var(--accent);border:1px solid rgba(56,189,248,.2)" title="Stored on server">🖥 Server</span>`
-        : `<span style="font-size:9px;padding:2px 6px;border-radius:100px;background:rgba(100,116,139,.1);color:var(--muted);border:1px solid rgba(100,116,139,.2)" title="Not available">✗ Unavailable</span>`;
+        ? `<span class="badge-active" style="background:var(--primary-dim);color:var(--primary)">Server</span>`
+        : `<span class="badge-locked">Offline</span>`;
     
-    let dlBtn = '';
+    // ACTIONS
+    let actions = [];
     if (canDownload) {
-        if (!isOwner && isAdmin) {
-            // Admin can decrypt any other user's files (including other admins)
-            if (hasServer) {
-                dlBtn = `<div style="display:flex;gap:4px;justify-content:flex-end">
-                  <button class="tbl-btn" style="color:var(--muted);border-color:rgba(255,255,255,.1);padding:4px 8px" onclick="redownloadFile('${f.id}')" title="Download Encrypted Raw">⬇ Encrypted</button>
-                  <button class="tbl-btn" style="color:var(--orange);border-color:rgba(251,146,60,.3)" onclick="adminDecryptFile('${f.serverFileId}','${f.name}')">🔓 Admin Decrypt</button>
-                </div>`;
-            } else if (inMemory) {
-                dlBtn = `<button class="tbl-btn" style="color:var(--orange);border-color:rgba(251,146,60,.3)" onclick="adminDecryptLocalFile('${f.id}','${f.encryptedBy}','${f.name}')">🔓 Admin Decrypt (Local)</button>`;
-            }
-        } else {
-            dlBtn = `
-              <div style="display:flex;gap:4px;justify-content:flex-end">
-                <button class="tbl-btn" style="color:var(--muted);border-color:rgba(255,255,255,.1);padding:4px 8px" onclick="redownloadFile('${f.id}')" title="Download Encrypted Raw">⬇ Encrypted</button>
-                <button class="tbl-btn" style="color:var(--green);border-color:rgba(52,211,153,.3);padding:4px 8px" onclick="quickDecrypt('${f.id}','${f.name}')" title="Decrypt and Save Local Copy">🔓 Decrypt</button>
-              </div>
-            `;
+      if (!isOwner && isAdmin) {
+        if (hasServer) {
+          actions.push(`<button class="tbl-btn" onclick="redownloadFile('${f.id}')" title="Encrypted">Encrypted</button>`);
+          actions.push(`<button class="tbl-btn" style="color:var(--orange);border-color:var(--orange-dim)" onclick="adminDecryptFile('${f.serverFileId}','${f.name}')">🔓 Admin Decrypt</button>`);
+        } else if (inMemory) {
+          actions.push(`<button class="tbl-btn" style="color:var(--orange);border-color:var(--orange-dim)" onclick="adminDecryptLocalFile('${f.id}','${f.encryptedBy}','${f.name}')">🔓 Admin Decrypt</button>`);
         }
+      } else {
+        actions.push(`<button class="tbl-btn" onclick="redownloadFile('${f.id}')" title="Encrypted">Encrypted</button>`);
+        actions.push(`<button class="tbl-btn" style="color:var(--green);border-color:var(--green-dim)" onclick="quickDecrypt('${f.id}','${f.name}')">🔓 Decrypted</button>`);
+      }
+    }
+    
+    if (hasServer && !f.projectId && isOwner) {
+      actions.push(`<button class="tbl-btn" style="color:var(--accent);border-color:var(--accent-dim)" onclick="openShareModal('${f.serverFileId}', '${f.id}')">🔗 Share</button>`);
+    }
+    
+    if (isOwner || isAdmin) {
+      actions.push(`<button class="tbl-btn" style="color:var(--red);border-color:var(--red-dim)" onclick="deleteRegistryEntry('${f.id}')">✕</button>`);
     }
 
-    const shareBtn=canShare
-      ? `<button class="tbl-btn" style="color:var(--accent);border-color:rgba(56,189,248,.3)" onclick="openShareModal('${f.serverFileId}', '${f.id}')">🔗 Share</button>`
-      : '';
-    const delBtn=(isOwner || isAdmin) ? `<button class="tbl-btn" style="color:var(--red);border-color:rgba(248,113,113,.3)" onclick="deleteRegistryEntry('${f.id}')" title="Remove">✕</button>` : '';
-    
-    const adminDetails = isAdmin && !isOwner ? `
-      <div style="margin-top:6px;font-size:11px;color:var(--dim);display:flex;flex-direction:column;gap:4px;background:var(--surface2);padding:8px 10px;border-radius:6px">
-        <div style="display:flex;gap:12px">
-          <span><strong style="color:var(--orange)">Owner:</strong> ${f.encryptedBy}</span>
-          <span><strong style="color:var(--orange)">Last Accessed:</strong> ${(f.lastAccessed||f.time).replace('T',' ').slice(0,19)}</span>
-        </div>
-        ${f.ownerSessionKey ? `<div><strong style="color:var(--cyan)">Escrowed Identity Key:</strong> <code style="color:var(--text);font-size:10px">${f.ownerSessionKey}</code></div>` : ''}
-      </div>
-    ` : '';
-
     return `
-    <div class="registry-item" id="reg-item-${f.id}">
-      <div class="registry-icon">${fileIcon(f.name)}</div>
-      <div class="registry-info">
-        <div class="registry-name">${f.encName}</div>
-        <div class="registry-meta"><span>${fmtBytes(f.size)}</span><span>by ${f.encryptedBy}</span><span>${f.time.replace('T',' ').slice(0,19)}</span><span style="color:var(--dim)">${f.mode||''}</span></div>
-        <div class="registry-hash">SHA-256: ${f.contentHash}</div>
-        ${adminDetails}
-      </div>
-      <div class="registry-actions" style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
-        ${sourceTag}
-        ${dlBtn}
-        ${shareBtn}
-        ${delBtn}
-        <span class="badge-chain">⛓ Anchored</span>
-      </div>
-    </div>`;
+      <tr>
+        <td style="width:40px;text-align:center;font-size:20px">${fileIcon(f.name)}</td>
+        <td>
+          <div style="font-weight:600;color:var(--text);margin-bottom:2px">${f.encName}</div>
+          <div style="font-size:11px;color:var(--muted);display:flex;gap:12px">
+             <span>by <strong>${f.encryptedBy}</strong></span>
+             <span>${f.time.replace('T',' ').slice(0,16)}</span>
+          </div>
+        </td>
+        <td style="color:var(--muted)">${fmtBytes(f.size)}</td>
+        <td>${sourceTag}</td>
+        <td>
+          <div class="tbl-actions" style="justify-content:flex-end">
+            ${actions.join('')}
+          </div>
+        </td>
+      </tr>
+    `;
   }).join('');
+
+  el.innerHTML = `
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>File Name</th>
+            <th>Size</th>
+            <th>Location</th>
+            <th style="text-align:right">Downloads & Sharing</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+  `;
   window._currentRegistryView = mergedFiles;
+}
+
+function openShareModal(serverFileId, localId) {
+  const f = window._currentRegistryView.find(x => x.id === localId || x.serverFileId === serverFileId);
+  if (!f) return;
+  
+  document.getElementById('modal-title').textContent = 'Share to Project';
+  document.getElementById('modal-inner').classList.remove('wide');
+  
+  if (projectsCache.length === 0) {
+    document.getElementById('modal-body').innerHTML = `<p style="padding:20px;color:var(--muted)">No projects available to share with. Create a project first.</p>`;
+    document.getElementById('modal-confirm').style.display = 'none';
+  } else {
+    document.getElementById('modal-body').innerHTML = `
+      <div class="info-box" style="margin-bottom:20px">
+        <span class="info-box-icon">ℹ</span>
+        <span>Moving this file to a project will re-encrypt it for project members and allow them to access it based on their roles.</span>
+      </div>
+      <div class="field">
+        <label>Select Project</label>
+        <select id="share-project-id">
+          ${projectsCache.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+        </select>
+      </div>
+    `;
+    const btn = document.getElementById('modal-confirm');
+    btn.textContent = 'Share Now';
+    btn.className = 'op-btn btn-encrypt';
+    btn.style.display = 'inline-flex';
+    modalCallback = async () => {
+      const pid = document.getElementById('share-project-id').value;
+      await moveFileToProject(serverFileId, pid);
+      closeModal();
+    };
+  }
+  document.getElementById('modal').classList.add('open');
+}
+
+async function moveFileToProject(fileId, projectId) {
+  try {
+    toast('Sharing file with project...', 'info');
+    const resp = await fetch(`${apiUrl}/files/${fileId}/share?project_id=${projectId}`, {
+      method: 'POST',
+      headers: {'X-Session-Token': hexArr(currentUser.sessionKey)}
+    });
+    if (resp.ok) {
+      toast('File successfully shared with project', 'success');
+      renderRegistry();
+    } else {
+      const e = await resp.json().catch(()=>({detail:'Failed'}));
+      toast(e.detail, 'error');
+    }
+  } catch(e) {
+    toast('Network error during sharing', 'error');
+  }
 }
 
 async function adminDecryptFile(serverFileId, originalName) {
