@@ -452,8 +452,8 @@ async def verify_file(
 
     pid = project_id.strip() if project_id else ""
     project_key_hex = ""
+    db = load_db()
     if pid:
-        db = load_db()
         if pid in db["projects"] and get_member_role(db, pid, username) is not None:
             project_key_hex = db["projects"][pid].get("project_key", "")
 
@@ -941,6 +941,74 @@ async def upload_to_project(
             "X-File-Id": file_id,
         },
     )
+
+
+@app.post("/projects/{project_id}/rotate-keys")
+async def rotate_project_keys(
+    project_id: str,
+    username: str = Form(...)
+):
+    pid      = safe_id(project_id)
+    db       = load_db()
+    
+    if pid not in db["projects"]:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    
+    require_member(db, pid, username, "owner")
+    
+    project = db["projects"][pid]
+    old_key_hex = project.get("project_key")
+    if not old_key_hex:
+        raise HTTPException(status_code=500, detail="Project has no master key to rotate.")
+    
+    new_key_hex = os.urandom(32).hex()
+    
+    rotated_count = 0
+    # Process all files in this project
+    for fid, meta in db["files"].items():
+        if meta.get("project_id") == pid:
+            # Check FILES_DIR (primary)
+            blob_path = FILES_DIR / f"{fid}.enc"
+            
+            # Fallback for sync-uploaded files if they exist in vault
+            if not blob_path.exists():
+                vault_path = STORAGE_DIR / "vault" / fid
+                if vault_path.exists():
+                    blob_path = vault_path
+                else:
+                    continue
+            
+            try:
+                blob = blob_path.read_bytes()
+                # Decrypt with OLD key
+                # project-mode uses PID as AAD, so session/user/emp are ignored
+                plaintext = decrypt_bytes(blob, "", "", "", old_key_hex, pid)
+                
+                # Encrypt with NEW key
+                new_blob = encrypt_bytes(plaintext, "", "", "", new_key_hex, pid)
+                
+                # Update file on disk
+                blob_path.write_bytes(new_blob)
+                
+                # Update metadata
+                meta["enc_hash"] = hashlib.sha256(new_blob).hexdigest()
+                meta["size"] = len(new_blob)
+                meta["time"] = datetime.now(timezone.utc).isoformat()
+                rotated_count += 1
+            except Exception as e:
+                print(f"Error rotating file {fid}: {e}")
+                
+    # Update project key in DB
+    project["project_key"] = new_key_hex
+    save_db(db)
+    
+    log_event("ROTATE_KEYS", username, f"Project {project['name']}: {rotated_count} files", "OK", pid)
+    
+    return {
+        "status": "ok",
+        "project_id": pid,
+        "rotated_files": rotated_count
+    }
 
 
 # ── Project membership ────────────────────────────────────────────────────────
