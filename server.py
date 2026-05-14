@@ -95,9 +95,7 @@ def save_db(db: dict):
         tmp_path = DB_PATH.with_suffix(".tmp")
         try:
             tmp_path.write_text(json.dumps(db, indent=2), encoding="utf-8")
-            if DB_PATH.exists():
-                DB_PATH.unlink()
-            tmp_path.rename(DB_PATH)
+            os.replace(str(tmp_path), str(DB_PATH))
         except Exception as e:
             print(f"ERROR saving DB: {e}")
             if tmp_path.exists():
