@@ -483,27 +483,35 @@ canvas{width:100%!important}
 
 <div class="cursor-glow" id="cursor-glow"></div>
 <div class="app">
-<header>
-  <div class="logo">
+<header style="padding: 0 32px; height: 64px;">
+  <div class="logo" onclick="if(typeof currentUser !== 'undefined' && currentUser) { location.reload(); } else { goToLogin(); }" style="cursor:pointer">
     <div class="logo-mark">🛡</div>
     <div class="logo-text">SECURE<span>FS</span></div>
     <div class="desktop-badge">Native Desktop Pro</div>
     <span class="logo-v2">v2</span>
   </div>
-  <div class="header-mid" id="header-chain" style="display:none">
-    <div class="api-status-pill offline" id="api-pill" onclick="toggleApiConfig()" title="Click to configure backend URL">
-      <div class="api-status-dot offline" id="api-dot"></div>
-      <span id="api-pill-text">Backend Offline</span>
-    </div>
-    <div class="api-mode-toggle" id="api-mode-toggle" style="display:none">
-    </div>
-    <div style="display:flex;align-items:center;gap:6px;border-left:1px solid var(--border);padding-left:10px">
-      <div class="chain-dot" id="chain-status-dot"></div>
-      <span style="color:var(--orange);font-size:11px">Chain</span>
-      <span id="chain-block-count" style="color:var(--muted);font-size:11px"></span>
+  <div class="header-mid" id="header-chain" style="display:none; flex:1; justify-content:flex-end;">
+    <div class="api-mode-toggle" id="api-mode-toggle" style="display:none"></div>
+    <div class="header-actions" style="display:flex; align-items:center; gap: 16px;">
+      <div id="api-pill" class="api-status-pill offline" onclick="toggleApiConfig()" title="Click to configure backend URL">
+        <div id="api-dot" class="api-status-dot offline"></div>
+        <span id="api-pill-text">Backend Offline</span>
+      </div>
+      <div class="api-status-pill" onclick="if(typeof currentUser !== 'undefined' && currentUser) nav(document.querySelector('[data-panel=blockchain]'))" style="cursor:pointer">
+        <span style="color:var(--orange)">⛓</span>
+        <span id="chain-block-count">0 blocks</span>
+      </div>
     </div>
   </div>
-  <div class="header-right" id="header-user" style="display:none"></div>
+  <div class="header-right" id="header-user" style="display:none; margin-left: 16px;">
+    <div class="header-user">
+      <div class="header-user-avatar" id="current-user-initial">?</div>
+      <div class="header-user-info">
+        <div class="header-user-name" id="current-user-disp">User</div>
+        <div class="header-user-role" id="current-role-disp">Guest</div>
+      </div>
+    </div>
+  </div>
 </header>
 
 <!-- LOGIN -->
@@ -765,32 +773,7 @@ canvas{width:100%!important}
 
 <!-- MAIN -->
 <div id="main-screen">
-  <header class="app-header">
-    <div class="app-logo" onclick="location.reload()">
-      <div class="app-logo-icon">S</div>
-      <span>SecureFS <span style="color:var(--primary)">v2</span></span>
-    </div>
-    
-    <div class="header-actions">
-      <div id="api-pill" class="api-status-pill">
-        <div id="api-dot" class="api-status-dot"></div>
-        <span id="api-pill-text">Backend Status</span>
-      </div>
-      
-      <div class="api-status-pill" onclick="nav(document.querySelector('[data-panel=blockchain]'))" style="cursor:pointer">
-        <span style="color:var(--orange)">⛓</span>
-        <span id="chain-block-count">0 blocks</span>
-      </div>
 
-      <div class="header-user">
-        <div class="header-user-avatar" id="current-user-initial">?</div>
-        <div class="header-user-info">
-          <div class="header-user-name" id="current-user-disp">User</div>
-          <div class="header-user-role" id="current-role-disp">Guest</div>
-        </div>
-      </div>
-    </div>
-  </header>
 
   <div class="layout">
     <aside class="sidebar" id="sidebar">
@@ -1727,6 +1710,7 @@ function showMain() {
   document.getElementById('current-user-disp').textContent = currentUser.username;
   document.getElementById('current-role-disp').textContent = r;
   document.getElementById('current-user-initial').textContent = currentUser.username.charAt(0).toUpperCase();
+  document.getElementById('header-user').style.display='flex';
 
   const show=(id,perm)=>{ const el=document.getElementById(id); if(el) el.style.display=hasPerm(perm)?'flex':'none'; };
   show('nav-logs','view_logs'); show('nav-stats','view_stats'); show('nav-users','add_user');
