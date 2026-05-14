@@ -1283,8 +1283,8 @@ canvas{width:100%!important}
 <script>
 // CONSTANTS & STATE
 const ROLE_PERMISSIONS = {
-  DEVELOPER:  ['encrypt','decrypt','verify','view_logs','add_user','delete_user','modify_role','lock_account','unlock_account','view_stats'],
-  ADMIN:      ['encrypt','decrypt','verify','view_logs','add_user','lock_account','unlock_account','view_stats'],
+  DEVELOPER:  ['encrypt','decrypt','verify','view_logs','add_user','delete_user','modify_role','lock_account','unlock_account','view_stats','view_user_chain'],
+  ADMIN:      ['encrypt','decrypt','verify','view_logs','add_user','lock_account','unlock_account','view_stats','view_user_chain'],
   MANAGER:    ['encrypt','decrypt','verify'],
   USER:       ['encrypt','decrypt','verify'],
   AUDITOR:    ['view_logs','verify'],
@@ -2079,6 +2079,7 @@ async function renderUsers(){
     if(locked&&canUnlock) btns+=`<button class="tbl-btn" style="color:var(--green);border-color:rgba(52,211,153,.3)" onclick="doUnlock('${n}')">Unlock</button>`;
     if(!locked&&canLock&&!isSelf) btns+=`<button class="tbl-btn" style="color:var(--amber);border-color:rgba(251,191,36,.3)" onclick="doLock('${n}')">Lock</button>`;
     if(canDelete&&!isSelf) btns+=`<button class="tbl-btn" style="color:var(--red);border-color:rgba(248,113,113,.3)" onclick="doDelete('${n}')">Delete</button>`;
+    if(hasPerm('view_user_chain')) btns+=`<button class="tbl-btn" style="color:var(--cyan);border-color:rgba(34,211,238,.3)" onclick="viewUserChain('${n}')">⛓ Chain</button>`;
     return `<tr><td>${n}${isSelf?` <span style="font-size:10px;color:var(--muted)">(you)</span>`:''}</td><td style="color:var(--muted)">${u.employeeId}</td><td><span class="role-tag role-${u.role}">${u.role}</span></td><td>${locked?'<span class="badge-locked">🔒 Locked</span>':'<span class="badge-active">● Active</span>'}</td><td><div class="tbl-actions">${btns||'<span style="color:var(--dim);font-size:11px">—</span>'}</div></td></tr>`;
   }).join('');
   el.innerHTML=`<table><thead><tr><th>Username</th><th>Emp ID</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -2578,22 +2579,41 @@ async function deleteRegistryEntry(id){
 function clearRegistry(){ fileRegistry=[]; saveRegistry(); renderRegistry(); toast('Registry cleared.','info'); }
 
 // BLOCKCHAIN EXPLORER
-function renderBlockchain(){
+function renderBlockchain(viewUser){
+  // Determine whose chain to render
+  const isAdmin = hasPerm('view_user_chain');
+  const targetUser = viewUser || currentUser.username;
+  // Admins with no viewUser specified see ALL blocks; regular users see only their own
+  const visibleChain = (isAdmin && !viewUser)
+    ? blockchain
+    : blockchain.filter(b => !b.data?.user || b.data.user === targetUser);
+
   const summary=document.getElementById('chain-summary');
   const explorer=document.getElementById('chain-explorer');
   updateChainUI();
-  summary.innerHTML=`
-    <div class="chain-stat"><div class="chain-stat-val">${blockchain.length}</div><div class="chain-stat-label">Total Blocks</div></div>
+
+  // Show whose chain is displayed
+  const ownerLabel = viewUser
+    ? `<div style="margin-bottom:16px;padding:10px 16px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.25);border-radius:10px;font-size:13px;color:var(--cyan)">
+        <strong>⛓ Viewing blockchain for: ${viewUser}</strong>
+        <span style="color:var(--muted);margin-left:8px">(${visibleChain.length} blocks)</span>
+       </div>`
+    : isAdmin ? `<div style="margin-bottom:16px;padding:10px 16px;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);border-radius:10px;font-size:12px;color:var(--purple)">
+        🛡 <strong>Admin view</strong> — showing all users' blocks. Use the <strong>⛓ Chain</strong> button in User Management to view a specific user's chain.
+       </div>` : '';
+
+  summary.innerHTML=ownerLabel+`
+    <div class="chain-stat"><div class="chain-stat-val">${visibleChain.length}</div><div class="chain-stat-label">Total Blocks</div></div>
     <div style="width:1px;height:36px;background:var(--border)"></div>
-    <div class="chain-stat"><div class="chain-stat-val" style="color:var(--green)">${blockchain.filter(b=>b.data?.status==='OK'||b.data?.status==='PASSED').length}</div><div class="chain-stat-label">Successful Ops</div></div>
+    <div class="chain-stat"><div class="chain-stat-val" style="color:var(--green)">${visibleChain.filter(b=>b.data?.status==='OK'||b.data?.status==='PASSED').length}</div><div class="chain-stat-label">Successful Ops</div></div>
     <div style="width:1px;height:36px;background:var(--border)"></div>
-    <div class="chain-stat"><div class="chain-stat-val" style="color:var(--red)">${blockchain.filter(b=>b.data?.status==='FAIL'||b.data?.status==='FAILED').length}</div><div class="chain-stat-label">Failed Ops</div></div>
+    <div class="chain-stat"><div class="chain-stat-val" style="color:var(--red)">${visibleChain.filter(b=>b.data?.status==='FAIL'||b.data?.status==='FAILED').length}</div><div class="chain-stat-label">Failed Ops</div></div>
     <div style="width:1px;height:36px;background:var(--border)"></div>
-    <div class="chain-stat"><div class="chain-stat-val" style="color:var(--accent)">${blockchain.filter(b=>b.data?.action==='ENCRYPT').length}</div><div class="chain-stat-label">Encryptions</div></div>`;
+    <div class="chain-stat"><div class="chain-stat-val" style="color:var(--accent)">${visibleChain.filter(b=>b.data?.action==='ENCRYPT').length}</div><div class="chain-stat-label">Encryptions</div></div>`;
   
   const canvas = document.getElementById('chain-canvas');
-  if (!blockchain.length){ 
-    explorer.innerHTML='<div class="empty"><div class="empty-icon">⛓</div><div class="empty-txt">No blocks yet. Perform any action to create the first block.</div></div>'; 
+  if (!visibleChain.length){ 
+    explorer.innerHTML='<div class="empty"><div class="empty-icon">⛓</div><div class="empty-txt">No blocks found.</div></div>'; 
     canvas.style.display='none';
     return; 
   }
@@ -2602,13 +2622,12 @@ function renderBlockchain(){
   canvas.style.display='block';
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const blocks = [...blockchain].slice(-10); // Show last 10 blocks
+  const blocks = [...visibleChain].slice(-10); // Show last 10 blocks
   const nodeW = 70, nodeH = 50;
   const startX = 60, startY = 65, spacing = 95;
   
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 2;
-  // Draw lines
   ctx.beginPath();
   ctx.moveTo(startX + nodeW/2, startY + nodeH/2);
   for(let i=1; i<blocks.length; i++) {
@@ -2616,20 +2635,15 @@ function renderBlockchain(){
   }
   ctx.stroke();
 
-  // Draw nodes
   blocks.forEach((b, i) => {
     const x = startX + i*spacing;
     const y = startY;
     const actionColor={ENCRYPT:'#38bdf8',DECRYPT:'#34d399',VERIFY:'#fbbf24',LOGIN_SUCCESS:'#34d399',LOGIN_FAIL:'#f87171',ADD_USER:'#a78bfa',DELETE_USER:'#f87171'}[b.data?.action]||'#a1a1aa';
     const actionText = (b.data?.action || 'GENESIS').replace('LOGIN_SUCCESS','LOGIN').replace('LOGIN_FAIL','FAILED');
-    
-    // Node box
     ctx.fillStyle = 'rgba(39,39,42,0.8)';
     ctx.fillRect(x, y, nodeW, nodeH);
     ctx.strokeStyle = actionColor;
     ctx.strokeRect(x, y, nodeW, nodeH);
-    
-    // Node text
     ctx.fillStyle = '#fff';
     ctx.font = '11px Inter';
     ctx.textAlign = 'center';
@@ -2639,7 +2653,7 @@ function renderBlockchain(){
     ctx.fillText(actionText, x + nodeW/2, y + 36);
   });
 
-  explorer.innerHTML=[...blockchain].reverse().map(b=>{
+  explorer.innerHTML=[...visibleChain].reverse().map(b=>{
     const isGenesis=b.index===0;
     const actionColor={ENCRYPT:'var(--accent)',DECRYPT:'var(--green)',VERIFY:'var(--amber)',LOGIN_SUCCESS:'var(--green)',LOGIN_FAIL:'var(--red)',LOGOUT:'var(--muted)',ADD_USER:'var(--purple)',DELETE_USER:'var(--red)',MODIFY_ROLE:'var(--purple)',LOCK_ACCOUNT:'var(--red)',UNLOCK_ACCOUNT:'var(--green)',LOGIN_SETUP:'var(--cyan)'}[b.data?.action]||'var(--muted)';
     return `<div class="block-card">
@@ -2656,6 +2670,41 @@ function renderBlockchain(){
       </div>
     </div>`;
   }).join('');
+}
+
+function viewUserChain(username) {
+  if (!hasPerm('view_user_chain')) { toast('Insufficient permissions.', 'error'); return; }
+  const userBlocks = blockchain.filter(b => !b.data?.user || b.data.user === username);
+  const actionColor = {ENCRYPT:'var(--accent)',DECRYPT:'var(--green)',VERIFY:'var(--amber)',LOGIN_SUCCESS:'var(--green)',LOGIN_FAIL:'var(--red)',LOGOUT:'var(--muted)',ADD_USER:'var(--purple)',DELETE_USER:'var(--red)',MODIFY_ROLE:'var(--purple)',LOCK_ACCOUNT:'var(--red)',UNLOCK_ACCOUNT:'var(--green)',LOGIN_SETUP:'var(--cyan)'};
+  const blocksHtml = userBlocks.length === 0
+    ? '<div class="empty"><div class="empty-icon">⛓</div><div class="empty-txt">No blockchain activity found for this user.</div></div>'
+    : [...userBlocks].reverse().map(b => {
+        const col = actionColor[b.data?.action] || 'var(--muted)';
+        return `<div class="block-card" style="margin-bottom:10px">
+          <div class="block-header">
+            <span class="block-num">#${b.index}</span>
+            <span class="block-action" style="color:${col}">${b.data?.action||'GENESIS'}</span>
+            ${b.data?.file&&b.data.file!=='-'?`<span style="font-size:10px;color:var(--dim)">${b.data.file}</span>`:''}
+            <span class="block-time">${(b.timestamp||'').replace('T',' ').slice(0,19)}</span>
+          </div>
+          <div class="block-hashes">
+            <div class="block-hash-row"><span class="block-hash-label">Block Hash</span><span class="block-hash-val">${b.hash}</span></div>
+            <div class="block-hash-row"><span class="block-hash-label">Prev Hash</span><span class="block-hash-val">${b.previousHash}</span></div>
+          </div>
+        </div>`;
+      }).join('');
+
+  document.getElementById('modal-title').textContent = `⛓ Blockchain Ledger — ${username}`;
+  document.getElementById('modal-inner').classList.add('wide');
+  document.getElementById('modal-body').innerHTML = `
+    <div style="margin-bottom:14px;padding:10px 14px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.25);border-radius:8px;font-size:12px;color:var(--cyan)">
+      🛡 <strong>Admin View</strong> — ${userBlocks.length} block(s) for <strong>${username}</strong>. This chain is filtered from the shared audit ledger.
+    </div>
+    <div style="max-height:60vh;overflow-y:auto;padding-right:4px">${blocksHtml}</div>`;
+  const btn = document.getElementById('modal-confirm');
+  btn.textContent = 'Close'; btn.className = 'op-btn btn-neutral';
+  modalCallback = closeModal;
+  document.getElementById('modal').classList.add('open');
 }
 
 // SETTINGS — CHANGE PASSWORD
